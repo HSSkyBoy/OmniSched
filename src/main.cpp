@@ -88,7 +88,7 @@ void apply_core_optimizations() {
     if (fs::exists(cpufreq_dir, ec)) {
         for (const auto& entry : fs::directory_iterator(cpufreq_dir, ec)) {
             std::string filename = entry.path().filename().string();
-            if (filename.starts_with("policy")) { // C++20 特性，比 find == 0 更直觀且高效
+            if (filename.find("policy") == 0) { 
                 policies.push_back(entry.path().string());
             }
         }
@@ -126,7 +126,7 @@ void apply_core_optimizations() {
     if (fs::exists(cpu_dir, ec)) {
         for (const auto& entry : fs::directory_iterator(cpu_dir, ec)) {
             std::string filename = entry.path().filename().string();
-            if (filename.starts_with("cpu") && filename.length() > 3 && std::isdigit(filename[3])) {
+            if (filename.find("cpu") == 0 && filename.length() > 3 && std::isdigit(filename[3])) {
                 write_node(entry.path().string() + "/cpufreq/scaling_governor", "schedutil");
             }
         }
@@ -160,7 +160,6 @@ int main() {
 
     while (true) {
         apply_core_optimizations();
-        
         std::this_thread::sleep_for(std::chrono::minutes(30));
     }
 
