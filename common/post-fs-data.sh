@@ -15,9 +15,9 @@ if [ -d "/sys/class/kgsl" ] || echo "$SOC_MAKER" | grep -qi "Qualcomm"; then
     # 高通 (Snapdragon) 專屬底層調優
     resetprop ro.vendor.qti.config.zram true
     resetprop ro.vendor.qti.sys.fw.bservice_enable true
-    # 限制高通核心控制的最大/最小干預，防止與我們的腳本衝突
+    # 限制高通核心控制的最大/最小干預
     resetprop ro.vendor.qti.core.ctl_max_cpu 4
-    resetprop ro.vendor.qti.core.ctl_min_cpu 2
+    resetprop ro.vendor.qti.core.ctl_min_cpu 0
     
 elif echo "$SOC_MAKER" | grep -qi "MediaTek"; then
     # 聯發科 (MediaTek) 專屬底層調優

@@ -65,9 +65,8 @@ echo "$CLUSTER_LITTLE" > /dev/cpuset/system-background/cpus 2>/dev/null
 
 # CPU 調度 基礎設定
 for GOV in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-        # 強制使用 schedutil
-        echo "schedutil" > "$GOV" 2>/dev/null
-    fi
+    # 強制使用 schedutil
+    echo "schedutil" > "$GOV" 2>/dev/null
 done
 
 # CPU & GPU 调度优化
