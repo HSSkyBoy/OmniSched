@@ -1,36 +1,40 @@
 #!/system/bin/sh
-# Please don't hardcode /magisk/modname/... ; instead, please use $MODDIR/...
-# This will make your scripts compatible even if Magisk change its mount point in the future
 MODDIR=${0%/*}
-write /proc/sys/vm/page-cluster 0
-write /sys/block/zram0/max_comp_streams 4
 
-# Set GPU Turbo Boost configurations
-setprop debug.composition.type c2d
-setprop debug.composition.type gpu
-setprop debug.enabletr true
-setprop debug.overlayui.enable 1
-setprop debug.performance.tuning 1
-setprop hw3d.force 1
-setprop hwui.disable_vsync true
-setprop hwui.render_dirty_regions false
-setprop persist.sys.composition.type c2d
-setprop persist.sys.composition.type gpu
-setprop persist.sys.ui.hw 1
-setprop ro.config.enable.hw_accel true
-setprop ro.product.gpu.driver 1
-setprop ro.fb.mode 1
-setprop ro.sf.compbypass.enable 0
-setprop video.accelerate.hw 1
-setprop debug.egl.hw 0
-setprop debug.gralloc.gfx_ubwc_disable 0
-setprop debug.mdpcomp.logs 0
-setprop persist.vendor.color.matrix 2
-setprop vendor.gralloc.disable_ubwc 0
-setprop ro.vendor.qti.sys.fw.bg_apps_limit 120
-setprop ro.vendor.qti.sys.fw.bservice_enable true
-setprop ro.vendor.qti.core.ctl_max_cpu 4
-setprop ro.vendor.qti.core.ctl_min_cpu 2
+# ZRAM 與記憶體底層優化
+echo 0 > /proc/sys/vm/page-cluster 2>/dev/null
+echo 4 > /sys/block/zram0/max_comp_streams 2>/dev/null
 
-# This script will be executed in post-fs-data mode
-# More info in the main Magisk thread
+A_API=$(getprop ro.build.version.sdk)
+if [ -n "$A_API" ] && [ "$A_API" -lt 31 ]; then
+    exit 0
+fi
+
+# 高通 (Snapdragon) 專屬底層屬性
+if [ -d "/sys/class/kgsl" ] || echo "$(getprop ro.soc.manufacturer)" | grep -qi "Qualcomm"; then
+    resetprop ro.vendor.qti.config.zram true
+    resetprop ro.vendor.qti.sys.fw.bservice_enable true
+
+    resetprop ro.vendor.qti.core.ctl_max_cpu 4
+    resetprop ro.vendor.qti.core.ctl_min_cpu 2
+fi
+
+# SurfaceFlinger
+resetprop debug.composition.type auto
+resetprop persist.sys.composition.type auto
+resetprop hwui.disable_vsync false
+resetprop debug.sf.enable_gl_backpressure 0
+
+# Vulkan 核心屬性強制
+resetprop ro.hwui.use_vulkan true
+resetprop debug.hwui.use_vulkan true
+resetprop debug.hwui.renderer skiavk
+resetprop debug.renderengine.backend skiavk
+resetprop debug.rs.default-GPU-driver vulkan
+resetprop hwui.render_dirty_regions true
+
+# 通用硬體加速
+resetprop ro.config.enable.hw_accel true
+resetprop persist.sys.ui.hw 1
+resetprop debug.enabletr true
+resetprop debug.overlayui.enable 1

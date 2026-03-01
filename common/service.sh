@@ -1,25 +1,52 @@
 #!/system/bin/sh
-# Please don't hardcode /magisk/modname/... ; instead, please use $MODDIR/...
-# This will make your scripts compatible even if Magisk change its mount point in the future
 MODDIR=${0%/*}
 
-# This script will be executed in late_start service mode
+until [ "$(getprop sys.boot_completed)" = "1" ]; do
+    sleep 2
+done
 
-write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor performance
-write /sys/devices/system/cpu/cpu1/cpufreq/scaling_governor performance
-write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor performance
-write /sys/devices/system/cpu/cpu3/cpufreq/scaling_governor performance
-write /sys/devices/system/cpu/cpufreq/policy0/scaling_governor performance
-write /sys/devices/system/cpu/cpufreq/policy4/scaling_governor performance
-write /sys/devices/system/cpu/cpufreq/performance/above_hispeed_delay 0
-write /sys/devices/system/cpu/cpufreq/performance/boost 1
-write /sys/devices/system/cpu/cpufreq/performance/go_hispeed_load 75
-write /sys/devices/system/cpu/cpufreq/performance/max_freq_hysteresis 1
-write /sys/devices/system/cpu/cpufreq/performance/align_windows 1
-write /sys/kernel/gpu/gpu_governor performance
-write /sys/module/adreno_idler/parameters/adreno_idler_active 0
-write /sys/module/lazyplug/parameters/nr_possible_cores 8
-write /sys/module/msm_performance/parameters/touchboost 1
-write /dev/cpuset/foreground/boost/cpus 4-7
-write /dev/cpuset/foreground/cpus 0-3,4-7
-write /dev/cpuset/top-app/cpus 0-7
+# CPU & GPU 调度优化
+for GOV in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+  if [ -e "$GOV" ]; then
+    echo "schedutil" > "$GOV" 2>/dev/null
+  fi
+done
+
+GPU_ADRENO="/sys/class/kgsl/kgsl-3d0/devfreq/governor"
+if [ -f "$GPU_ADRENO" ]; then
+  # 高通 Adreno
+  echo "msm-adreno-tz" > "$GPU_ADRENO" 2>/dev/null
+else
+  # 其他 SoC
+  for DEVFREQ in /sys/class/devfreq/*; do
+    if [ -f "$DEVFREQ/governor" ]; then
+      GOV_LIST=$(cat "$DEVFREQ/available_governors" 2>/dev/null)
+      if echo "$GOV_LIST" | grep -q "mali_ondemand"; then
+        echo "mali_ondemand" > "$DEVFREQ/governor" 2>/dev/null
+      elif echo "$GOV_LIST" | grep -q "simple_ondemand"; then
+        echo "simple_ondemand" > "$DEVFREQ/governor" 2>/dev/null
+      fi
+    fi
+  done
+fi
+
+# Cpuset 核心分配
+POSSIBLE_CPUS=$(cat /sys/devices/system/cpu/possible 2>/dev/null)
+MAX_CORE=$(echo "$POSSIBLE_CPUS" | awk -F'-' '{print $2}')
+if [ -z "$MAX_CORE" ]; then MAX_CORE=7; fi
+
+MID_CORE=$((MAX_CORE - 1)) # 排除最大超大核 (例如8核就是6)
+HALF_CORE=$((MAX_CORE / 2)) # 取一半作为小核区 (例如8核就是3，即0-3)
+
+# Top-app
+echo "0-$MAX_CORE" > /dev/cpuset/top-app/cpus 2>/dev/null
+# Foreground
+echo "0-$MID_CORE" > /dev/cpuset/foreground/cpus 2>/dev/null
+echo "0-$MAX_CORE" > /dev/cpuset/foreground/boost/cpus 2>/dev/null
+# Background & System
+echo "0-$HALF_CORE" > /dev/cpuset/background/cpus 2>/dev/null
+echo "0-$HALF_CORE" > /dev/cpuset/system-background/cpus 2>/dev/null
+
+# 系统 Settings 参数修改
+settings put system config.hw_quickpoweron true
+settings put system surface_flinger_use_frame_rate_api true

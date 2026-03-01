@@ -1,31 +1,43 @@
-# OmniSched | 全域灵动调度 🚀
+# OmniSched | 全域靈動 🚀
 
-一款基于 Snapdragon 8 Gen 3 顶配调度逻辑，并将其“泛用化”的底层内核与系统优化模块。专为 Android 12+ (API 31+) 设备打造。
+[![Android 12+](https://img.shields.io/badge/Android-12%2B-3DDC84?style=flat-square&logo=android)](#)
+[![Root Required](https://img.shields.io/badge/Root-Magisk%20%7C%20KernelSU-orange?style=flat-square)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](#)
 
-## 🌟 核心特性
+**OmniSched** 是一款重構安卓調度邏輯的現代化 Android 底層優化模組。我們摒棄了傳統模組中「寫死核心數」與「綁定特定處理器」的過時做法，透過**全域動態運算**，將旗艦級的效能與能耗比帶給每一台 Android 12+ 設備。
 
-本模块摒弃了传统的“硬编码”方式，采用纯动态计算，真正做到**通杀所有 Android 12+ 设备**，无视处理器品牌与核心数量：
+## 💡 為什麼選擇 OmniSched？
 
-* **🧠 智能 SoC 识别**：动态遍历并识别高通 Adreno 或联发科/猎户座 Mali GPU 节点，自动应用最佳的动态能效调度器 (`msm-adreno-tz` / `mali_ondemand`)。
-* **⚙️ 动态 Cpuset 分配**：自动读取设备 `possible_cpus`，动态计算大、中、小核梯度。无论你是 4 核、8 核还是未来的多核异构处理器，都能完美剥离后台进程，让前台游戏独占算力，后台彻底锁死小核省电。
-* **🎮 底层渲染劫持**：在系统刚挂载数据的 `post-fs-data` 阶段，强制接管 `ro.` 属性。全局开启 Vulkan 渲染，启用 SkiaVK 后端，并开启“脏区域渲染 (Dirty Regions)”大幅降低 GPU 功耗。
-* **⚖️ Schedutil 全域平衡**：强制统一 CPU 调度器为 `schedutil`，利用现代内核的负载感知能力，实现毫秒级的极速频率伸缩。
+市面上多數的調度模組往往針對特定機型（如純 8 核或純高通平台）進行硬編碼（Hardcode）。一旦刷入不同架構的設備（如聯發科、獵戶座，或未來的異構多核），輕則無效，重則導致系統卡死、發熱耗電。
 
-## 📱 兼容性
+OmniSched 的誕生就是為了解決這個痛點：**一次刷入，全平台自適應。**
 
-* **Android 版本**：仅限 Android 12 及以上 (API 31+) 
-* **处理器环境**：不限 (Qualcomm, MediaTek, Exynos 等均可)
-* **Root 环境**：Magisk / KernelSU / APatch 均可完美刷入生效
+## 🌟 核心黑科技
 
-## 📂 模块文件结构
+* **🧠 智能 SoC 動態嗅探**
+    開機瞬間自動偵測底層硬體。若為高通 (Qualcomm) 設備，自動解鎖專屬 QTI 底層優化與 Adreno 最佳調度 (`msm-adreno-tz`)；若為聯發科 (MediaTek) 或獵戶座 (Exynos) 等通用平台，則無縫切換至泛用型 Mali 動態調度。
+* **⚙️ Cpuset 動態幾何分配**
+    不再寫死 `0-7` 或 `0-3`。腳本會自動讀取設備的極限核心數，動態劃分「大、中、小」核梯度。讓前台遊戲 (Top-app) 獨占最強算力，後台進程 嚴格鎖死於省電小核。
+* **🎮 底層渲染深度劫持 (A12+ 專屬)**
+    在 `post-fs-data` 階段提前接管 `ro.` 唯讀屬性。全域強制開啟 Vulkan 引擎與 SkiaVK 渲染後端，並啟用「髒區域渲染 (Dirty Regions)」，僅重新繪製畫面有變動的部分，大幅降低 GPU 渲染負載。
+* **⚖️ Schedutil 負載感知**
+    強制統一 CPU 調度器為 `schedutil`，沒有無腦鎖滿頻的發熱問題。
+* **✨ 零「安慰劑」代碼**
+    不含 Android 4.0-8.0 時代遺留的無效代碼腳本極簡輕量，執行效率極高。
 
-将下载或自己打包的 ZIP 模块解压后，应包含以下结构：
+## 📱 系統相容性
 
-```text
-OmniSched/
-├── META-INF/
-│   └── com/google/android/update-binary & updater-script (刷入脚本)
-├── module.prop         # 模块信息文件
-├── post-fs-data.sh     # 渲染层属性劫持 (开机前期执行)
-├── service.sh          # Cpuset & 调度器动态计算 (开机完成后执行)
-└── README.md           # 本说明文件
+* **系統版本：** Android 12 及以上 (API 31+)。
+* **處理器環境：** Qualcomm, MediaTek, Exynos 等。
+* **Root 環境：** 支援 Magisk / KernelSU / APatch 等。
+
+## 📥 安裝與使用
+
+1. 在 Release 頁面下載最新版的 `OmniSched-xxx.zip`。
+2. 打開 Magisk 或 KernelSU 的「模組」頁面。
+3. 選擇「從本機安裝」，選取下載的 ZIP 壓縮檔。
+4. 觀察安裝介面的設備偵測提示，確認無誤後重啟手機。
+
+## ⚠️ 免責聲明
+
+本模組涉及 Android 底層 Cpuset 與 GPU/CPU 調度調整。雖然經過了嚴格的動態相容性設計，但刷機仍有風險。因使用本模組導致的任何數據遺失或設備異常，開發者不承擔任何責任。**建議刷入前做好重要數據備份。**
