@@ -1,20 +1,20 @@
 #!/system/bin/sh
 ui_print "========================================="
-ui_print "      OmniSched | 全域靈動分配 (A12+)"
+ui_print "      OmniSched | 全域灵动分配 (V3)"
 ui_print "       Author：HSSkyBoy/nikobe918"
 ui_print "========================================="
 
 sleep 0.4
-ui_print "- 正在初始化環境與檢測設備相容性..."
+ui_print "- 正在初始化环境与检测设备相容性..."
 
 API=$(getprop ro.build.version.sdk)
 DEVICE_MODEL=$(getprop ro.product.model)
 SOC_MAKER=$(getprop ro.soc.manufacturer)
 
 sleep 0.6
-ui_print "- 設備型號: $DEVICE_MODEL"
-ui_print "- 處理器平台: $SOC_MAKER"
-ui_print "- 當前系統 API: $API"
+ui_print "- 设备型号: $DEVICE_MODEL"
+ui_print "- 处理器平台: $SOC_MAKER"
+ui_print "- 当前系统 API: $API"
 ui_print "-"
 
 if [ "$API" -lt 31 ]; then
@@ -29,7 +29,7 @@ if [ -d "/sys/class/kgsl" ] || echo "$SOC_MAKER" | grep -qi "Qualcomm"; then
     ui_print "- 侦测到高通 Snapdragon 平台！"
     ui_print "- 已启用 QTI 专属底层优化与 ZRAM 配置。"
 elif echo "$SOC_MAKER" | grep -qi "MediaTek" || echo "$SOC_MAKER" | grep -qi "MTK"; then
-    ui_print "- 侦测到联发科天玑 平台！"
+    ui_print "- 侦测到联发科天玑平台！"
     ui_print "- 已启用 MTK 专属底层优化与调度配置。"
 else
     ui_print "- 侦测到通用平台。"
@@ -38,13 +38,32 @@ fi
 
 ui_print "-"
 ui_print "- 正在部署核心调度文件..."
+
+CONFIG_DIR="/data/adb/omnisched"
+if [ ! -d "$CONFIG_DIR" ]; then
+    ui_print "- 正在建立动态配置环境 (WebUI 支援)..."
+    mkdir -p "$CONFIG_DIR"
+    
+    cat <<EOF > "$CONFIG_DIR/config.json"
+{
+  "poll_interval_seconds": 911,
+  "cpuset": {
+    "background_little_core_only": true
+  },
+  "render": {
+    "force_vulkan": true
+  }
+}
+EOF
+fi
+
 sleep 0.2
 ui_print "- 正在设定权限..."
-
 set_perm_recursive "$MODPATH" 0 0 0755 0755
+set_perm_recursive "$CONFIG_DIR" 0 0 0755 0644
 
 ui_print " "
 ui_print "========================================="
-ui_print "  安装完成！请重启系统以套用 OmniSched "
+ui_print "  安装完成！请重启系统以套用 OmniSched V3"
 ui_print "========================================="
 ui_print " "
