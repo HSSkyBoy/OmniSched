@@ -1,46 +1,15 @@
 #include "core_sched.h"
+#include "cpu_topology.h"
 #include "utils.h"
 #include <vector>
-#include <algorithm>
 #include <unistd.h>
 #include <dirent.h>
-#include <cstring>
-
-struct DeviceState {
-    bool is_mtk;
-    std::string all_cores;
-
-    static const DeviceState& get() {
-        static const DeviceState instance = []() {
-            const std::string platform = execute_command("getprop ro.board.platform");
-            const bool mtk = (platform.find("mt") != std::string::npos);
-            const std::optional<std::string> cores = read_node_opt("/sys/devices/system/cpu/possible");
-            return DeviceState{
-                mtk,
-                cores.value_or("0-7")
-            };
-        }();
-        return instance;
-    }
-};
 
 void init_daemon() {
     // 切換目錄至 "/" 並將標準輸出導向 /dev/null
     if (daemon(0, 0) < 0) {
         exit(EXIT_FAILURE);
     }
-}
-
-std::string get_best_cpu_governor(const std::string& avail_govs, bool is_mtk) {
-    if (is_mtk) {
-        if (avail_govs.find("sugov_ext") != std::string::npos) return "sugov_ext";
-        if (avail_govs.find("schedutil") != std::string::npos) return "schedutil";
-    } else {
-        if (avail_govs.find("walt") != std::string::npos) return "walt";
-        if (avail_govs.find("uag") != std::string::npos) return "uag";
-        if (avail_govs.find("schedutil") != std::string::npos) return "schedutil";
-    }
-    return ""; 
 }
 
 void apply_memory_optimizations() {
@@ -59,50 +28,23 @@ void apply_memory_optimizations() {
 }
 
 void apply_core_optimizations() {
-    const auto& state = DeviceState::get(); // val state = DeviceState.get()
+    const auto& topology = CpuTopology::get(); 
     
     apply_memory_optimizations();
 
-    std::vector<std::string> policies;
-    const char* cpufreq_dir_path = "/sys/devices/system/cpu/cpufreq/";
+    write_node("/dev/cpuset/top-app/cpus", topology.all_cores.c_str());
     
-    if (DIR* dir = opendir(cpufreq_dir_path); dir) {
-        struct dirent* entry;
-        while ((entry = readdir(dir)) != nullptr) {
-            if (strncmp(entry->d_name, "policy", 6) == 0) {
-                policies.push_back(std::string(cpufreq_dir_path) + entry->d_name);
-            }
-        }
-        closedir(dir);
-    }
-    std::sort(policies.begin(), policies.end());
-
-    std::string cluster_little = "0-3"; 
-    std::string cluster_mid = state.all_cores;
-    std::string cluster_big = state.all_cores;
-
-    if (policies.size() >= 3) {
-        cluster_little = format_cpuset(read_node((policies[0] + "/affected_cpus").c_str()));
-        cluster_mid    = format_cpuset(read_node((policies[1] + "/affected_cpus").c_str()));
-        cluster_big    = format_cpuset(read_node((policies[2] + "/affected_cpus").c_str()));
-    } else if (policies.size() == 2) {
-        cluster_little = format_cpuset(read_node((policies[0] + "/affected_cpus").c_str()));
-        cluster_big    = format_cpuset(read_node((policies[1] + "/affected_cpus").c_str()));
-        cluster_mid    = cluster_big;
-    }
-
-    write_node("/dev/cpuset/top-app/cpus", state.all_cores.c_str());
-    if (!cluster_mid.empty() && cluster_mid != cluster_big) {
-        write_node("/dev/cpuset/foreground/cpus", combine_cpus(cluster_little, cluster_mid).c_str());
+    if (!topology.cluster_mid.empty() && topology.cluster_mid != topology.cluster_big) {
+        const std::string fg_cpus = combine_cpus(topology.cluster_little, topology.cluster_mid);
+        write_node("/dev/cpuset/foreground/cpus", fg_cpus.c_str());
     } else {
-        write_node("/dev/cpuset/foreground/cpus", state.all_cores.c_str());
+        write_node("/dev/cpuset/foreground/cpus", topology.all_cores.c_str());
     }
     
-    const std::string sys_bg_cpus = combine_cpus(cluster_little, cluster_mid);
+    const std::string sys_bg_cpus = combine_cpus(topology.cluster_little, topology.cluster_mid);
     write_node("/dev/cpuset/system-background/cpus", sys_bg_cpus.c_str());
-    write_node("/dev/cpuset/background/cpus", cluster_little.c_str());
+    write_node("/dev/cpuset/background/cpus", topology.cluster_little.c_str());
 
-    // Android 14+ 
     if (path_exists("/dev/cpuset/top-app/uclamp.min")) {
         write_node("/dev/cpuset/top-app/uclamp.max", "max");
         write_node("/dev/cpuset/top-app/uclamp.min", "10");
@@ -111,20 +53,17 @@ void apply_core_optimizations() {
         write_node("/dev/cpuset/system-background/uclamp.max", "50");
     }
 
-    if (DIR* cpu_dir = opendir("/sys/devices/system/cpu/"); cpu_dir) {
-        struct dirent* entry;
-        while ((entry = readdir(cpu_dir)) != nullptr) {
-            if (strncmp(entry->d_name, "cpu", 3) == 0 && isdigit(entry->d_name[3])) {
-                const std::string base_path = std::string("/sys/devices/system/cpu/") + entry->d_name + "/cpufreq/";
-                const std::string avail_govs = read_node((base_path + "scaling_available_governors").c_str());
-                const std::string best_gov = get_best_cpu_governor(avail_govs, state.is_mtk);
-                
-                if (!best_gov.empty()) {
-                    write_node((base_path + "scaling_governor").c_str(), best_gov.c_str());
+    if (!topology.best_cpu_governor.empty()) {
+        if (DIR* cpu_dir = opendir("/sys/devices/system/cpu/"); cpu_dir) {
+            struct dirent* entry;
+            while ((entry = readdir(cpu_dir)) != nullptr) {
+                if (strncmp(entry->d_name, "cpu", 3) == 0 && isdigit(entry->d_name[3])) {
+                    const std::string gov_path = std::string("/sys/devices/system/cpu/") + entry->d_name + "/cpufreq/scaling_governor";
+                    write_node(gov_path.c_str(), topology.best_cpu_governor.c_str());
                 }
             }
+            closedir(cpu_dir);
         }
-        closedir(cpu_dir);
     }
 
     const char* adreno_path = "/sys/class/kgsl/kgsl-3d0/devfreq/governor";
