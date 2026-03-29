@@ -29,7 +29,7 @@ void apply_memory_optimizations() {
     }
 }
 
-void apply_core_optimizations() {
+void apply_base_optimizations() {
     const auto& topology = CpuTopology::get(); 
     const auto& config = OmniConfig::get();
     const auto& root = RootEnvironment::get_adapter();
@@ -54,57 +54,49 @@ void apply_core_optimizations() {
         write_node("/dev/cpuset/background/cpus", sys_bg_cpus.c_str());
     }
 
-    if (path_exists("/dev/cpuset/top-app/uclamp.min")) {
-        write_node("/dev/cpuset/top-app/uclamp.max", "max");
-        write_node("/dev/cpuset/top-app/uclamp.min", "10");
-        
+    if (path_exists("/dev/cpuset/background/uclamp.max")) {
         write_node("/dev/cpuset/background/uclamp.max", "50");
         write_node("/dev/cpuset/system-background/uclamp.max", "50");
     }
 
-    if (!topology.best_cpu_governor.empty()) {
-        if (DIR* cpu_dir = opendir("/sys/devices/system/cpu/"); cpu_dir) {
-            struct dirent* entry;
-            while ((entry = readdir(cpu_dir)) != nullptr) {
-                if (strncmp(entry->d_name, "cpu", 3) == 0 && isdigit(entry->d_name[3])) {
-                    const std::string gov_path = std::string("/sys/devices/system/cpu/") + entry->d_name + "/cpufreq/scaling_governor";
-                    write_node(gov_path.c_str(), topology.best_cpu_governor.c_str());
-                }
-            }
-            closedir(cpu_dir);
-        }
-    }
-
     const char* adreno_path = "/sys/class/kgsl/kgsl-3d0/devfreq/governor";
-    if (path_exists(adreno_path)) {
-        write_node(adreno_path, "msm-adreno-tz");
-    } else if (DIR* devfreq_dir = opendir("/sys/class/devfreq/"); devfreq_dir) {
-        struct dirent* entry;
-        while ((entry = readdir(devfreq_dir)) != nullptr) {
-            if (entry->d_name[0] == '.') continue;
-            
-            const std::string gov_path = std::string("/sys/class/devfreq/") + entry->d_name + "/governor";
-            const std::string avail_path = std::string("/sys/class/devfreq/") + entry->d_name + "/available_governors";
-            const std::string avail_govs = read_node(avail_path.c_str());
-
-            if (avail_govs.find("mali_ondemand") != std::string::npos) {
-                write_node(gov_path.c_str(), "mali_ondemand");
-            } else if (avail_govs.find("simple_ondemand") != std::string::npos) {
-                write_node(gov_path.c_str(), "simple_ondemand");
-            }
-        }
-        closedir(devfreq_dir);
-    }
+    if (path_exists(adreno_path)) write_node(adreno_path, "msm-adreno-tz");
 
     if (config.force_vulkan) {
-        root.set_system_prop("ro.hwui.renderer", "skiavk");
         root.set_system_prop("debug.hwui.renderer", "skiavk");
-        root.set_system_prop("debug.renderengine.backend", "skiavk");
-        root.set_system_prop("ro.hwui.use_vulkan", "true");
     } else {
-        root.set_system_prop("ro.hwui.renderer", "skia");
         root.set_system_prop("debug.hwui.renderer", "skiagl");
-        root.set_system_prop("debug.renderengine.backend", "skiagl");
-        root.set_system_prop("ro.hwui.use_vulkan", "false");
+    }
+}
+
+void apply_dynamic_profile(ProfileMode mode, bool is_lite) {
+    const auto& topology = CpuTopology::get();
+
+    if (mode == ProfileMode::PERFORMANCE) {
+        // Lite Mode 放寬 CPU 調度器限制
+        std::string gov = is_lite ? topology.best_cpu_governor : "performance";
+        set_cpu_governor(gov);
+        
+        if (path_exists("/dev/cpuset/top-app/uclamp.min")) {
+            write_node("/dev/cpuset/top-app/uclamp.min", is_lite ? "20" : "50");
+            write_node("/dev/cpuset/top-app/uclamp.max", "max");
+        }
+        write_node("/sys/class/kgsl/kgsl-3d0/force_clk_on", is_lite ? "0" : "1");
+    } 
+    else if (mode == ProfileMode::BALANCE) {
+        set_cpu_governor(topology.best_cpu_governor);
+        if (path_exists("/dev/cpuset/top-app/uclamp.min")) {
+            write_node("/dev/cpuset/top-app/uclamp.min", "10");
+            write_node("/dev/cpuset/top-app/uclamp.max", "max");
+        }
+        write_node("/sys/class/kgsl/kgsl-3d0/force_clk_on", "0");
+    }
+    else if (mode == ProfileMode::POWERSAVE) {
+        set_cpu_governor("powersave"); 
+        if (path_exists("/dev/cpuset/top-app/uclamp.max")) {
+            write_node("/dev/cpuset/top-app/uclamp.min", "0");
+            write_node("/dev/cpuset/top-app/uclamp.max", "50");
+        }
+        write_node("/sys/class/kgsl/kgsl-3d0/force_clk_on", "0");
     }
 }

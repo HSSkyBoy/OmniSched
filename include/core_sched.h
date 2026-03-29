@@ -1,7 +1,8 @@
 #pragma once
 
 #include <string>
+#include "config.h"
 
 void init_daemon();
-std::string get_best_cpu_governor(const std::string& avail_govs);
-void apply_core_optimizations();
+void apply_base_optimizations();
+void apply_dynamic_profile(ProfileMode mode, bool is_lite);

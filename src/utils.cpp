@@ -1,7 +1,10 @@
 #include "utils.h"
-#include <cstdio>
-#include <sys/stat.h>
 #include <algorithm>
+#include <cstdio>
+#include <dirent.h>
+#include <fstream>
+#include <sstream>
+#include <sys/stat.h>
 
 bool write_node(const char* path, const char* value) {
     const std::string current_value = read_node(path); // 模擬 val
@@ -69,4 +72,42 @@ std::string execute_command(const char* cmd) {
         result.pop_back();
     }
     return result;
+}
+
+std::string get_package_name(int pid) {
+    std::string path = "/proc/" + std::to_string(pid) + "/cmdline";
+    if (auto cmdline = read_node_opt(path.c_str())) {
+        std::string name = cmdline.value();
+        size_t pos = name.find('\0');
+        if (pos != std::string::npos) name = name.substr(0, pos);
+        return name;
+    }
+    return "";
+}
+
+std::string detect_foreground_app() {
+    std::ifstream file("/dev/cpuset/top-app/tasks");
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        int pid = std::stoi(line);
+        std::string pkg = get_package_name(pid);
+        if (!pkg.empty() && pkg.find(".") != std::string::npos) {
+            return pkg;
+        }
+    }
+    return "";
+}
+
+void set_cpu_governor(const std::string& gov) {
+    if (DIR* cpu_dir = opendir("/sys/devices/system/cpu/"); cpu_dir) {
+        struct dirent* entry;
+        while ((entry = readdir(cpu_dir)) != nullptr) {
+            if (strncmp(entry->d_name, "cpu", 3) == 0 && isdigit(entry->d_name[3])) {
+                const std::string gov_path = std::string("/sys/devices/system/cpu/") + entry->d_name + "/cpufreq/scaling_governor";
+                write_node(gov_path.c_str(), gov.c_str());
+            }
+        }
+        closedir(cpu_dir);
+    }
 }

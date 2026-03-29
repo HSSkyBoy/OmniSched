@@ -1,118 +1,348 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>OmniSched</title>
-<style>
-/* ColorOS 深色模式设计规范变量 */
-:root {
-    --bg: #0F0F10;
-    --card: #1C1C1E;
-    --primary: #2BA84A;
-    --primary-dark: #24903F;
-    --text: #F5F5F7;
-    --secondary: #8E8E93;
-    --border: #2C2C2E;
-    --switch-off-bg: #3A3A3C;
-    --toast-bg: rgba(30, 30, 32, 0.85);
-}
-body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:24px 16px;margin:0;-webkit-tap-highlight-color:transparent}
-.card{background:var(--card);border-radius:24px;padding:20px 24px;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.15)}
-.t{font-size:20px;font-weight:600;margin-bottom:6px}
-.st{font-size:13px;color:var(--secondary);margin-bottom:20px;line-height:1.4}
-.li{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid var(--border)}
-.li:last-child{border:0;padding-bottom:0}
-.it{font-size:16px;font-weight:500;margin-bottom:4px}
-.id{font-size:12px;color:var(--secondary);line-height:1.4;padding-right:16px}
-.sw{position:relative;width:52px;height:32px;flex-shrink:0}
-.sw input{opacity:0;width:0;height:0}
-.sl{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--switch-off-bg);transition:.3s;border-radius:32px}
-.sl:before{position:absolute;content:"";height:24px;width:24px;left:4px;bottom:4px;background:#fff;transition:.3s;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.2)}
-input:checked+.sl{background:var(--primary)}
-input:checked+.sl:before{transform:translateX(20px)}
-.rc{margin-top:16px;padding:12px 0 4px;border-bottom:1px solid var(--border)}
-.rh{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-.rv{font-size:16px;font-weight:600;color:var(--primary)}
-input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;background:linear-gradient(to right,var(--primary) var(--pc,0%),var(--switch-off-bg) var(--pc,0%));border-radius:8px;outline:0;margin-bottom:16px}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .2s}
-input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
-.toast{position:fixed;bottom:40px;left:50%;transform:translate(-50%,20px);background:var(--toast-bg);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:var(--text);padding:14px 24px;border-radius:100px;font-size:14px;font-weight:500;opacity:0;visibility:hidden;transition:.4s;pointer-events:none;z-index:99}
-.toast.s{opacity:1;visibility:visible;transform:translate(-50%,0)}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+    <title>OmniSched</title>
+    <style>
+        /* ColorOS 深色模式设计规范变量 */
+        :root {
+            --bg: #0F0F10;
+            --card: #1C1C1E;
+            --primary: #2BA84A;
+            --primary-dark: #24903F;
+            --text: #F5F5F7;
+            --secondary: #8E8E93;
+            --border: #2C2C2E;
+            --switch-off-bg: #3A3A3C;
+            --toast-bg: rgba(30, 30, 32, 0.85);
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, sans-serif;
+            padding: 24px 16px;
+            margin: 0;
+            -webkit-tap-highlight-color: transparent
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 20px 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, .15);
+            margin-bottom: 16px;
+        }
+
+        .t {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 6px
+        }
+
+        .st {
+            font-size: 13px;
+            color: var(--secondary);
+            margin-bottom: 20px;
+            line-height: 1.4
+        }
+
+        .li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .li:last-child {
+            border: 0;
+            padding-bottom: 0
+        }
+
+        .it {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 4px
+        }
+
+        .id {
+            font-size: 12px;
+            color: var(--secondary);
+            line-height: 1.4;
+            padding-right: 16px
+        }
+
+        .sw {
+            position: relative;
+            width: 52px;
+            height: 32px;
+            flex-shrink: 0
+        }
+
+        .sw input {
+            opacity: 0;
+            width: 0;
+            height: 0
+        }
+
+        .sl {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--switch-off-bg);
+            transition: .3s;
+            border-radius: 32px
+        }
+
+        .sl:before {
+            position: absolute;
+            content: "";
+            height: 24px;
+            width: 24px;
+            left: 4px;
+            bottom: 4px;
+            background: #fff;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, .2)
+        }
+
+        input:checked+.sl {
+            background: var(--primary)
+        }
+
+        input:checked+.sl:before {
+            transform: translateX(20px)
+        }
+
+        .rc {
+            margin-top: 16px;
+            padding: 12px 0 4px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .rh {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px
+        }
+
+        .rv {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary)
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: linear-gradient(to right, var(--primary) var(--pc, 0%), var(--switch-off-bg) var(--pc, 0%));
+            border-radius: 8px;
+            outline: 0;
+            margin-bottom: 16px
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+            transition: transform .2s
+        }
+
+        input[type=range]:active::-webkit-slider-thumb {
+            transform: scale(1.15)
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translate(-50%, 20px);
+            background: var(--toast-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            color: var(--text);
+            padding: 14px 24px;
+            border-radius: 100px;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            visibility: hidden;
+            transition: .4s;
+            pointer-events: none;
+            z-index: 99
+        }
+
+        .toast.s {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0)
+        }
+
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            background: var(--switch-off-bg);
+            color: var(--text);
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        select:focus,
+        textarea:focus {
+            outline: 1px solid var(--primary);
+        }
+    </style>
 </head>
+
 <body>
-<div class="card">
-    <div class="t">OmniSched 核心配置</div>
-    <div class="st">设置将自动写入底层，守护进程即时热重载，无需重启设备。</div>
-    <div class="rc">
-        <div class="rh"><div class="it">兜底巡检间隔 (秒)</div><div class="rv" id="v_i">950</div></div>
-        <input type="range" id="i_i" min="300" max="3600" step="50" value="950">
+    <div class="card">
+        <div class="t">OmniSched 核心配置</div>
+        <div class="st">动态资源分配与场景识别。</div>
+        <div class="rc">
+            <div class="rh">
+                <div class="it">全局效能配置档</div>
+            </div>
+            <select id="i_prof">
+                <option value="balance">均衡 (动态场景切换)</option>
+                <option value="performance">强制效能 (无惧发热)</option>
+                <option value="powersave">强制省电 (算力钳制)</option>
+            </select>
+        </div>
+        <div class="li">
+            <div>
+                <div class="it">游戏场景识别</div>
+                <div class="id">自动侦测白名单，倾注算力资源给前台游戏。</div>
+            </div>
+            <label class="sw"><input type="checkbox" id="i_g"><span class="sl"></span></label>
+        </div>
+        <div class="li" style="border-bottom:none; padding-bottom:0;">
+            <div>
+                <div class="it">Lite Mode (轻量模式)</div>
+                <div class="id">游戏时放宽调度器限制，兼顾续航与发热。</div>
+            </div>
+            <label class="sw"><input type="checkbox" id="i_l"><span class="sl"></span></label>
+        </div>
+        <div class="rc" style="border:none;">
+            <div class="rh">
+                <div class="it" style="font-size:14px;">游戏白名单 (包名)</div>
+            </div>
+            <textarea id="i_gl" rows="3" placeholder="例如: com.miHoYo.Yuanshen&#10;使用逗号或换行分隔"></textarea>
+        </div>
     </div>
-    <div class="li">
-        <div><div class="it">强制 Vulkan 渲染</div><div class="id">Android 14+ 推荐，劫持 Ski底层引擎降低 GPU 负载。</div></div>
-        <label class="sw"><input type="checkbox" id="i_v"><span class="sl"></span></label>
+
+    <div class="card">
+        <div class="t">底层核心配置</div>
+        <div class="st">设定将即时写入并热重载。</div>
+        <div class="rc">
+            <div class="rh">
+                <div class="it">兜底巡检间隔 (秒)</div>
+                <div class="rv" id="v_i">950</div>
+            </div>
+            <input type="range" id="i_i" min="300" max="3600" step="50" value="950">
+        </div>
+        <div class="li">
+            <div>
+                <div class="it">强制 Vulkan 渲染</div>
+                <div class="id">Android 14+ 推荐，劫持 Ski底层引擎降低 GPU 负载。</div>
+            </div>
+            <label class="sw"><input type="checkbox" id="i_v"><span class="sl"></span></label>
+        </div>
+        <div class="li">
+            <div>
+                <div class="it">背景严格锁死小核</div>
+                <div class="id">将后台进程 Cpuset 隔离在小核集群，改善待机功耗。</div>
+            </div>
+            <label class="sw"><input type="checkbox" id="i_b"><span class="sl"></span></label>
+        </div>
     </div>
-    <div class="li">
-        <div><div class="it">背景严格锁死小核</div><div class="id">将后台进程 Cpuset 隔离在小核集群，改善待机功耗。</div></div>
-        <label class="sw"><input type="checkbox" id="i_b"><span class="sl"></span></label>
-    </div>
-</div>
-<div id="toast" class="toast">设置已保存并生效</div>
-<script>
-const P = "/data/adb/omnisched/config.json";
-const DEFAULT_CONFIG = {
-    poll_interval_seconds: 950,
-    cpuset: { background_little_core_only: true },
-    render: { force_vulkan: false }
-};
-let cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-let tm;
-const _=(id)=>document.getElementById(id);
-const $i=_('i_i'), $v=_('v_i'), $vk=_('i_v'), $bg=_('i_b'), $t=_('toast');
+    <div id="toast" class="toast">设置已保存并生效</div>
+    <script>
+        const P = "/data/adb/omnisched/config.json";
+        const DEFAULT_CONFIG = {
+            poll_interval_seconds: 950,
+            cpuset: { background_little_core_only: true },
+            render: { force_vulkan: false },
+            current_profile: "balance",
+            game_mode_enabled: true,
+            lite_mode_enabled: false,
+            gamelist: ["com.miHoYo.Yuanshen", "com.kurogame.wutheringwaves.global"]
+        };
+        let cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+        let tm;
 
-    async function load() {
-        try {
-            let r = await ksu.exec(`cat ${P}`);
-            let out = typeof r === 'string' ? r : (r && r.stdout) || "";
-            out = out.trim();
-            if (out.startsWith('{')) {
-                let j = JSON.parse(out);
-                if (j.poll_interval_seconds !== undefined) cfg.poll_interval_seconds = j.poll_interval_seconds;
-                if (j.cpuset && j.cpuset.background_little_core_only !== undefined) cfg.cpuset.background_little_core_only = j.cpuset.background_little_core_only;
-                if (j.render && j.render.force_vulkan !== undefined) cfg.render.force_vulkan = j.render.force_vulkan;
-            }
-        } catch (e) {}
-        updUI();
-    }
+        const _ = (id) => document.getElementById(id);
+        const $i = _('i_i'), $v = _('v_i'), $vk = _('i_v'), $bg = _('i_b');
+        const $prof = _('i_prof'), $gm = _('i_g'), $lm = _('i_l'), $gl = _('i_gl'), $t = _('toast');
 
-    function updUI() {
-        $i.value = cfg.poll_interval_seconds;
-        $v.textContent = cfg.poll_interval_seconds;
-        $vk.checked = cfg.render.force_vulkan;
-        $bg.checked = cfg.cpuset.background_little_core_only;
-        fill($i);
-    }
+        async function load() {
+            try {
+                let r = await ksu.exec(`cat ${P}`);
+                let out = typeof r === 'string' ? r : (r && r.stdout) || "";
+                out = out.trim();
+                if (out.startsWith('{')) {
+                    let j = JSON.parse(out);
+                    if (j.poll_interval_seconds !== undefined) cfg.poll_interval_seconds = j.poll_interval_seconds;
+                    if (j.cpuset && j.cpuset.background_little_core_only !== undefined) cfg.cpuset.background_little_core_only = j.cpuset.background_little_core_only;
+                    if (j.render && j.render.force_vulkan !== undefined) cfg.render.force_vulkan = j.render.force_vulkan;
+                    if (j.current_profile !== undefined) cfg.current_profile = j.current_profile;
+                    if (j.game_mode_enabled !== undefined) cfg.game_mode_enabled = j.game_mode_enabled;
+                    if (j.lite_mode_enabled !== undefined) cfg.lite_mode_enabled = j.lite_mode_enabled;
+                    if (j.gamelist) cfg.gamelist = j.gamelist;
+                }
+            } catch (e) { }
+            updUI();
+        }
 
-    function fill(e) {
-        e.style.setProperty('--pc', `${((e.value - e.min) / (e.max - e.min)) * 100}%`);
-    }
+        function updUI() {
+            $i.value = cfg.poll_interval_seconds;
+            $v.textContent = cfg.poll_interval_seconds;
+            $vk.checked = cfg.render.force_vulkan;
+            $bg.checked = cfg.cpuset.background_little_core_only;
+            $prof.value = cfg.current_profile;
+            $gm.checked = cfg.game_mode_enabled;
+            $lm.checked = cfg.lite_mode_enabled;
+            $gl.value = cfg.gamelist.join('\n');
+            fill($i);
+        }
 
-    async function save() {
-        cfg.poll_interval_seconds = parseInt($i.value);
-        cfg.render.force_vulkan = $vk.checked;
-        cfg.cpuset.background_little_core_only = $bg.checked;
-        await ksu.exec(`echo '${JSON.stringify(cfg)}' > ${P}`);
-        clearTimeout(tm);
-        $t.classList.add('s');
-        tm = setTimeout(() => $t.classList.remove('s'), 2000);
-    }
+        function fill(e) { e.style.setProperty('--pc', `${((e.value - e.min) / (e.max - e.min)) * 100}%`); }
 
-    $i.addEventListener('input', e => { $v.textContent = e.target.value; fill(e.target); });
-    $i.addEventListener('change', save);
-    $vk.addEventListener('change', save);
-    $bg.addEventListener('change', save);
-    load();
-</script>
+        async function save() {
+            cfg.poll_interval_seconds = parseInt($i.value);
+            cfg.render.force_vulkan = $vk.checked;
+            cfg.cpuset.background_little_core_only = $bg.checked;
+            cfg.current_profile = $prof.value;
+            cfg.game_mode_enabled = $gm.checked;
+            cfg.lite_mode_enabled = $lm.checked;
+            cfg.gamelist = $gl.value.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+
+            await ksu.exec(`echo '${JSON.stringify(cfg)}' > ${P}`);
+            clearTimeout(tm);
+            $t.classList.add('s');
+            tm = setTimeout(() => $t.classList.remove('s'), 2000);
+        }
+
+        $i.addEventListener('input', e => { $v.textContent = e.target.value; fill(e.target); });
+        [$i, $vk, $bg, $prof, $gm, $lm, $gl].forEach(el => el.addEventListener('change', save));
+        load();
+    </script>
 </body>
+
 </html>

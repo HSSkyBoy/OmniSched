@@ -27,9 +27,11 @@ public:
         epoll_ctl(epoll_fd, EPOLL_CTL_ADD, inotify_fd, &ev);
         
         const std::vector<std::string> target_nodes = {
+            "/dev/cpuset/top-app/tasks",
             "/dev/cpuset/top-app/cpus",
             "/dev/cpuset/background/cpus",
-            "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor"
+            "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor",
+            "/data/adb/omnisched/config.json"
         };
         
         for (const auto& node : target_nodes) {

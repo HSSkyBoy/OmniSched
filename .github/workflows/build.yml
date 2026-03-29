@@ -49,5 +49,5 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v6
       with:
-        name: OmniSched-v3-Release-${{ steps.date.outputs.today }}
+        name: OmniSched-Release-${{ steps.date.outputs.today }}
         path: OmniSched-v3-Release.zip
