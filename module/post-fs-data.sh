@@ -15,32 +15,35 @@ if [ "$A_API" -ge 34 ]; then
     resetprop -n ro.lmk.swap_util_max 90
 fi
 
-# 渲染引擎動態分配
-SOC_MAKER=$(getprop ro.soc.manufacturer)
+# 從配置檔同步渲染引擎設定
+CONFIG_FILE="/data/adb/omnisched/config.json"
+FORCE_VULKAN=false
 
-if echo "$SOC_MAKER" | grep -qi "MediaTek"; then
-    # 天璣 (MediaTek) 專屬
+if [ -f "$CONFIG_FILE" ]; then
+    if grep -q '"force_vulkan"\s*:\s*true' "$CONFIG_FILE" || grep -q '"force_vulkan":true' "$CONFIG_FILE"; then
+        FORCE_VULKAN=true
+    fi
+else
+    # 預設邏輯
+    SOC_MAKER=$(getprop ro.soc.manufacturer)
+    if echo "$SOC_MAKER" | grep -qi "MediaTek" || { [ "$A_API" -ge 31 ] && [ "$A_API" -lt 34 ]; }; then
+        FORCE_VULKAN=true
+    fi
+fi
+
+if [ "$FORCE_VULKAN" = "true" ]; then
     resetprop -n ro.hwui.renderer skiavk
     resetprop -n debug.hwui.renderer skiavk
     resetprop -n debug.renderengine.backend skiavk
     resetprop -n ro.hwui.use_vulkan true
     resetprop -n debug.renderengine.graphite false
 else
-    # 常规 SoC 判斷
+    resetprop -n ro.hwui.renderer skia
+    resetprop -n debug.hwui.renderer skiagl
+    resetprop -n debug.renderengine.backend skiagl
+    resetprop -n ro.hwui.use_vulkan false
     if [ "$A_API" -ge 34 ]; then
-        # Android 14~16
-        resetprop -n ro.hwui.renderer skia
-        resetprop -n debug.hwui.renderer skia
-        resetprop -n debug.renderengine.backend skia
-        resetprop -n ro.hwui.use_vulkan true
         resetprop -n debug.renderengine.graphite true
-    elif [ "$A_API" -ge 31 ]; then
-        # Android 12~13
-        resetprop -n ro.hwui.renderer skiavk
-        resetprop -n debug.hwui.renderer skiavk
-        resetprop -n debug.renderengine.backend skiavk
-        resetprop -n ro.hwui.use_vulkan true
-        resetprop -n debug.renderengine.graphite false
     fi
 fi
 
