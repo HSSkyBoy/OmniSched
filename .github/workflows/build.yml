@@ -1,4 +1,4 @@
-name: Build OmniSched v3
+name: Build OmniSched v3.1
 
 on:
   push:
