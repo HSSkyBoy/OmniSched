@@ -24,7 +24,7 @@ if [ "$API" -lt 31 ]; then
     abort "! 安裝已中止。"
 fi
 
-# 核心硬體平台偵測與提示
+# 内核硬件平台侦测与提示
 if [ -d "/sys/class/kgsl" ] || echo "$SOC_MAKER" | grep -qi "Qualcomm"; then
     ui_print "- 侦测到高通 Snapdragon 平台！"
     ui_print "- 已启用 QTI 专属底层优化与 ZRAM 配置。"
@@ -33,25 +33,25 @@ elif echo "$SOC_MAKER" | grep -qi "MediaTek" || echo "$SOC_MAKER" | grep -qi "MT
     ui_print "- 已启用 MTK 专属底层优化与调度配置。"
 else
     ui_print "- 侦测到通用平台。"
-    ui_print "- 将套用动态通用型调度并强制 Vulkan 渲染。"
+    ui_print "- 将套用动态通用型调度与稍后选择的渲染引擎。"
 fi
 
 ui_print "-"
 ui_print "****************************************"
-ui_print "* 請選擇是否預設開啟強制 Vulkan 渲染   *"
-ui_print "* [音量上 +] : 預設開啟                *"
-ui_print "* [音量下 -] : 預設關閉                *"
-ui_print "******** (按任意音量鍵開始選擇) ********"
+ui_print "* 请选择是否预设打开强制 Vulkan 渲染   *"
+ui_print "* [音量 +] : 预设打开                *"
+ui_print "* [音量 -] : 预设关闭                *"
+ui_print "******** (按任意音量键开始选择) ********"
 sleep 1
 while true; do
     key_event=$(getevent -qlc 1 2>/dev/null)
     if echo "$key_event" | grep -q -iE 'KEY_VOLUMEUP'; then
         VK_FORCE=true
-        ui_print "-> 已選擇：預設開啟強制 Vulkan"
+        ui_print "-> 将预设打开强制 Vulkan"
         break
     elif echo "$key_event" | grep -q -iE 'KEY_VOLUMEDOWN'; then
         VK_FORCE=false
-        ui_print "-> 已選擇：預設關閉強制 Vulkan"
+        ui_print "-> 将预设关闭强制 Vulkan"
         break
     fi
 done
@@ -80,7 +80,5 @@ set_perm_recursive "$MODPATH" 0 0 0755 0755
 set_perm_recursive "$CONFIG_DIR" 0 0 0755 0754
 
 ui_print " "
-ui_print "========================================="
 ui_print "  安装完成！请重启系统以套用 OmniSched V3"
-ui_print "========================================="
 ui_print " "

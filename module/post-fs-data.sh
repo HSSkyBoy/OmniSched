@@ -36,6 +36,9 @@ if [ "$FORCE_VULKAN" = "true" ]; then
     resetprop -n debug.hwui.renderer skiavk
     resetprop -n debug.renderengine.backend skiavk
     resetprop -n ro.hwui.use_vulkan true
+    resetprop -n debug.vulkan.layers 0
+    resetprop -n debug.hwui.skia_tracing_enabled false
+    resetprop -n debug.renderengine.vulkan.precompile.enabled true
     resetprop -n debug.renderengine.graphite false
 fi
 
