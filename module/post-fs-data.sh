@@ -37,14 +37,6 @@ if [ "$FORCE_VULKAN" = "true" ]; then
     resetprop -n debug.renderengine.backend skiavk
     resetprop -n ro.hwui.use_vulkan true
     resetprop -n debug.renderengine.graphite false
-else
-    resetprop -n ro.hwui.renderer skia
-    resetprop -n debug.hwui.renderer skiagl
-    resetprop -n debug.renderengine.backend skiagl
-    resetprop -n ro.hwui.use_vulkan false
-    if [ "$A_API" -ge 34 ]; then
-        resetprop -n debug.renderengine.graphite true
-    fi
 fi
 
 # 設備底層屬性調優

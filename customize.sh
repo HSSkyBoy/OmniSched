@@ -37,7 +37,27 @@ else
 fi
 
 ui_print "-"
-ui_print "- 正在部署核心调度文件..."
+ui_print "****************************************"
+ui_print "* 請選擇是否預設開啟強制 Vulkan 渲染   *"
+ui_print "* [音量上 +] : 預設開啟                *"
+ui_print "* [音量下 -] : 預設關閉                *"
+ui_print "******** (按任意音量鍵開始選擇) ********"
+sleep 1
+while true; do
+    key_event=$(getevent -qlc 1 2>/dev/null)
+    if echo "$key_event" | grep -q -iE 'KEY_VOLUMEUP'; then
+        VK_FORCE=true
+        ui_print "-> 已選擇：預設開啟強制 Vulkan"
+        break
+    elif echo "$key_event" | grep -q -iE 'KEY_VOLUMEDOWN'; then
+        VK_FORCE=false
+        ui_print "-> 已選擇：預設關閉強制 Vulkan"
+        break
+    fi
+done
+
+ui_print "-"
+ui_print "- 正在部署核心调配文件..."
 ui_print "-"
 ui_print "- 正在建立动态配置环境 (WebUI 支援)..." 
 ui_print "- 正在编写核心配置..."
@@ -45,8 +65,13 @@ CONFIG_DIR="/data/adb/omnisched"
 if [ ! -d "$CONFIG_DIR" ]; then
     mkdir -p "$CONFIG_DIR"
     cat <<EOF > "$CONFIG_DIR/config.json"
-{"poll_interval_seconds":950,"cpuset":{"background_little_core_only":true},"render":{"force_vulkan":true}}
+{"poll_interval_seconds":950,"cpuset":{"background_little_core_only":true},"render":{"force_vulkan":${VK_FORCE}}}
 EOF
+else
+    sed -i "s/\"force_vulkan\"\s*:\s*[a-z]*/\"force_vulkan\":${VK_FORCE}/g" "$CONFIG_DIR/config.json"
+    if ! grep -q '"force_vulkan"' "$CONFIG_DIR/config.json"; then
+        sed -i 's/"render"\s*:\s*{/"render":{"force_vulkan":'"${VK_FORCE}"',/g' "$CONFIG_DIR/config.json"
+    fi
 fi
 
 sleep 0.2
