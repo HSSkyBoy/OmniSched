@@ -6,7 +6,7 @@ CONFIG_FILE="/data/adb/omnisched/config.json"
 # ZRAM 與記憶體底層優化
 echo 0 > /proc/sys/vm/page-cluster 2>/dev/null
 A_API=$(getprop ro.build.version.sdk)
-if [ -n "$A_API" ] && [ "$A_API" -lt 31 ]; then
+if [ -z "$A_API" ] || [ "$A_API" -lt 31 ]; then
     exit 0
 fi
 
@@ -19,15 +19,18 @@ fi
 
 FORCE_VULKAN=false
 if [ -f "$CONFIG_FILE" ]; then
-    v=$(grep -o '"force_vulkan"[[:space:]]*:[[:space:]]*\(true\|false\)' "$CONFIG_FILE" 2>/dev/null \
+    FORCE_VULKAN_VALUE=$(grep -o '"force_vulkan"[[:space:]]*:[[:space:]]*\(true\|false\)' "$CONFIG_FILE" 2>/dev/null \
         | tail -n1 \
         | sed 's/.*:[[:space:]]*//')
-    [ "$v" = "true" ] && FORCE_VULKAN=true
+
+    if [ "$FORCE_VULKAN_VALUE" = "true" ]; then
+        FORCE_VULKAN=true
+    fi
 fi
 
 SOC_MAKER=$(getprop ro.soc.manufacturer)
 if [ "$FORCE_VULKAN" = "true" ]; then
-    if echo "$SOC_MAKER" | grep -qi "MediaTek"; then
+    if echo "$SOC_MAKER" | grep -qi "MediaTek\|MTK"; then
         # 天璣 (MediaTek) 專屬
         resetprop -n ro.hwui.renderer skiavk
         resetprop -n debug.hwui.renderer skiavk
@@ -43,7 +46,7 @@ if [ "$FORCE_VULKAN" = "true" ]; then
             resetprop -n debug.renderengine.backend skiavk
             resetprop -n ro.hwui.use_vulkan true
             resetprop -n debug.renderengine.graphite true
-        elif [ "$A_API" -ge 31 ]; then
+        else
             # Android 12~13
             resetprop -n ro.hwui.renderer skiavk
             resetprop -n debug.hwui.renderer skiavk
@@ -62,18 +65,16 @@ fi
 # 設備底層屬性調優
 if [ -d "/sys/class/kgsl" ] || echo "$SOC_MAKER" | grep -qi "Qualcomm"; then
     # 高通 (Snapdragon) 專屬底層調優
-    resetprop ro.vendor.qti.config.zram true
-    resetprop ro.vendor.qti.sys.fw.bservice_enable true
-    # 限制高通核心控制的最大/最小干預
-    resetprop ro.vendor.qti.core.ctl_max_cpu 4
-    resetprop ro.vendor.qti.core.ctl_min_cpu 0
-    
-elif echo "$SOC_MAKER" | grep -qi "MediaTek"; then
+    resetprop -n ro.vendor.qti.config.zram true
+    resetprop -n ro.vendor.qti.sys.fw.bservice_enable true
+    resetprop -n ro.vendor.qti.core.ctl_max_cpu 4
+    resetprop -n ro.vendor.qti.core.ctl_min_cpu 0
+
+elif echo "$SOC_MAKER" | grep -qi "MediaTek\|MTK"; then
     # 聯發科 (MediaTek) 專屬底層調優
-    resetprop ro.mtk_perf_fast_start_win 1
-    resetprop ro.mtk_perf_response_time 1
-    resetprop ro.vendor.mtk_zram_extend 1
-    # 針對天璣高階晶片的額外穩定屬性
+    resetprop -n ro.mtk_perf_fast_start_win 1
+    resetprop -n ro.mtk_perf_response_time 1
+    resetprop -n ro.vendor.mtk_zram_extend 1
     resetprop -n ro.vendor.mtk.sensor.support true
     resetprop -n ro.vendor.num_mdm_crashes 0
 fi

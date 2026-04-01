@@ -24,38 +24,59 @@ fi
 
 # 核心硬體平台偵測與提示
 if [ -d "/sys/class/kgsl" ] || echo "$SOC_MAKER" | grep -qi "Qualcomm"; then
-    ui_print "- 侦测到高通 Snapdragon 平台！"
-    ui_print "- 已启用 QTI 专属底层优化与 ZRAM 配置。"
+    ui_print "- 侦测到高通平台：启用 QTI 专属优化。"
 elif echo "$SOC_MAKER" | grep -qi "MediaTek" || echo "$SOC_MAKER" | grep -qi "MTK"; then
-    ui_print "- 侦测到联发科天玑平台！"
-    ui_print "- 已启用 MTK 专属底层优化与调度配置。"
+    ui_print "- 侦测到联发科平台：启用 MTK 专属调度。"
 else
-    ui_print "- 侦测到通用平台。"
-    ui_print "- 将套用动态通用型调度。"
+    ui_print "- 侦测到通用平台：套用动态调度逻辑。"
 fi
 
 ui_print "-"
-ui_print "- 正在部署核心调度文件..."
-ui_print "- 正在建立动态配置环境 (WebUI)..."
+ui_print "请选择是否预设开启「强制 Vulkan 渲染」"
+ui_print "注意：部分设备开启后可能导致卡开机，建议首刷用户选「关闭」"
+ui_print ""
+ui_print " [音量 +] : 预设开启"
+ui_print " [音量 -] : 预设关闭"
 
-ui_print "- 请选择是否「预设开启强制 Vulkan 渲染」"
-ui_print "  音量 +：开启"
-ui_print "  音量 -：关闭"
+VK_FORCE=false
+KEY_TIMEOUT=10
+KEY_PRESSED=0
 
-FORCE_VULKAN_DEFAULT=false
-if chooseport; then
-    FORCE_VULKAN_DEFAULT=true
-    ui_print "- 已选择：预设开启强制 Vulkan。"
+if command -v getevent >/dev/null 2>&1; then
+    ui_print "- 等待音量键输入（${KEY_TIMEOUT} 秒后预设关闭）..."
+
+    i=0
+    while [ "$i" -lt "$KEY_TIMEOUT" ]; do
+        key_event=$(getevent -qlc 1 2>/dev/null)
+
+        if echo "$key_event" | grep -qi "KEY_VOLUMEUP"; then
+            VK_FORCE=true
+            KEY_PRESSED=1
+            ui_print "-> 已选择：预设开启强制 Vulkan"
+            break
+        elif echo "$key_event" | grep -qi "KEY_VOLUMEDOWN"; then
+            VK_FORCE=false
+            KEY_PRESSED=1
+            ui_print "-> 已选择：预设关闭强制 Vulkan"
+            break
+        fi
+
+        i=$((i + 1))
+        sleep 1
+    done
+
+    if [ "$KEY_PRESSED" -eq 0 ]; then
+        ui_print "-> 未侦测到按键输入，将使用预设值：关闭强制 Vulkan"
+    fi
 else
-    FORCE_VULKAN_DEFAULT=false
-    ui_print "- 已选择：预设关闭强制 Vulkan。"
+    ui_print "-> 当前环境不支援 getevent，将使用预设值：关闭强制 Vulkan"
 fi
 
 ui_print "- 正在写入核心配置..."
 CONFIG_DIR="/data/adb/omnisched"
-if [ ! -d "$CONFIG_DIR" ]; then
-    mkdir -p "$CONFIG_DIR"
-fi
+CONFIG_FILE="$CONFIG_DIR/config.json"
+
+mkdir -p "$CONFIG_DIR"
 
 if [ ! -f "$CONFIG_DIR/config.json" ]; then
     cat <<EOF > "$CONFIG_DIR/config.json"
@@ -71,6 +92,6 @@ set_perm_recursive "$MODPATH" 0 0 0755 0755
 set_perm_recursive "$CONFIG_DIR" 0 0 0755 0754
 
 ui_print ""
-ui_print "安装完成：请重启系统以套用 OmniSched v3。"
-ui_print "提示：后续可在 WebUI / config.json 随时修改 Vulkan 开关。"
+ui_print "安装完成！请重启系统以套用 $MOD_NAME。"
+ui_print "提示：若卡在第一屏，可进入安全模式移除模组，或手动删除 $CONFIG_FILE。"
 ui_print ""
