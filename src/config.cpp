@@ -29,6 +29,6 @@ void OmniConfig::reload() {
     
     if (data.contains("render") && data["render"].is_object()) {
         current_config.force_vulkan = 
-            data["render"].value("force_vulkan", true);
+            data["render"].value("force_vulkan", false);
     }
 }

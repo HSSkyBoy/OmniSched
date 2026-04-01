@@ -1,6 +1,8 @@
 #!/system/bin/sh
 MODDIR=${0%/*}
 
+CONFIG_FILE="/data/adb/omnisched/config.json"
+
 # ZRAM 與記憶體底層優化
 echo 0 > /proc/sys/vm/page-cluster 2>/dev/null
 A_API=$(getprop ro.build.version.sdk)
@@ -15,33 +17,46 @@ if [ "$A_API" -ge 34 ]; then
     resetprop -n ro.lmk.swap_util_max 90
 fi
 
-# 渲染引擎動態分配
-SOC_MAKER=$(getprop ro.soc.manufacturer)
+FORCE_VULKAN=false
+if [ -f "$CONFIG_FILE" ]; then
+    v=$(grep -o '"force_vulkan"[[:space:]]*:[[:space:]]*\(true\|false\)' "$CONFIG_FILE" 2>/dev/null \
+        | tail -n1 \
+        | sed 's/.*:[[:space:]]*//')
+    [ "$v" = "true" ] && FORCE_VULKAN=true
+fi
 
-if echo "$SOC_MAKER" | grep -qi "MediaTek"; then
-    # 天璣 (MediaTek) 專屬
-    resetprop -n ro.hwui.renderer skiavk
-    resetprop -n debug.hwui.renderer skiavk
-    resetprop -n debug.renderengine.backend skiavk
-    resetprop -n ro.hwui.use_vulkan true
-    resetprop -n debug.renderengine.graphite false
-else
-    # 常规 SoC 判斷
-    if [ "$A_API" -ge 34 ]; then
-        # Android 14~16
-        resetprop -n ro.hwui.renderer skia
-        resetprop -n debug.hwui.renderer skia
-        resetprop -n debug.renderengine.backend skia
-        resetprop -n ro.hwui.use_vulkan true
-        resetprop -n debug.renderengine.graphite true
-    elif [ "$A_API" -ge 31 ]; then
-        # Android 12~13
+SOC_MAKER=$(getprop ro.soc.manufacturer)
+if [ "$FORCE_VULKAN" = "true" ]; then
+    if echo "$SOC_MAKER" | grep -qi "MediaTek"; then
+        # 天璣 (MediaTek) 專屬
         resetprop -n ro.hwui.renderer skiavk
         resetprop -n debug.hwui.renderer skiavk
         resetprop -n debug.renderengine.backend skiavk
         resetprop -n ro.hwui.use_vulkan true
         resetprop -n debug.renderengine.graphite false
+    else
+        # 常规 SoC 判斷
+        if [ "$A_API" -ge 34 ]; then
+            # Android 14~16
+            resetprop -n ro.hwui.renderer skia
+            resetprop -n debug.hwui.renderer skia
+            resetprop -n debug.renderengine.backend skiavk
+            resetprop -n ro.hwui.use_vulkan true
+            resetprop -n debug.renderengine.graphite true
+        elif [ "$A_API" -ge 31 ]; then
+            # Android 12~13
+            resetprop -n ro.hwui.renderer skiavk
+            resetprop -n debug.hwui.renderer skiavk
+            resetprop -n debug.renderengine.backend skiavk
+            resetprop -n ro.hwui.use_vulkan true
+            resetprop -n debug.renderengine.graphite false
+        fi
     fi
+
+    # Vulkan 強化
+    resetprop -n debug.vulkan.layers ""
+    resetprop -n debug.hwui.skia_tracing_enabled false
+    resetprop -n debug.renderengine.vulkan.precompile.enabled true
 fi
 
 # 設備底層屬性調優
