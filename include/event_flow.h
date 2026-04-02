@@ -8,13 +8,27 @@
 #include <unistd.h>
 #include <thread>
 #include <chrono>
+#include <algorithm>
+#include "config.h"
 
 class SchedEventFlow {
 private:
     int epoll_fd = -1;
     int inotify_fd = -1;
     std::vector<int> watch_descriptors;
-    const int TIMEOUT_MS = 15 * 60 * 1000; 
+    static constexpr int AUTO_TIMEOUT_SECONDS = 600;
+
+    int get_timeout_ms() const {
+        OmniConfig::reload();
+
+        int timeout_seconds = OmniConfig::get().poll_interval_seconds;
+        if (OmniConfig::get().auto_optimize) {
+            timeout_seconds = AUTO_TIMEOUT_SECONDS;
+        }
+
+        timeout_seconds = std::clamp(timeout_seconds, 300, 3600);
+        return timeout_seconds * 1000;
+    }
 
 public:
     SchedEventFlow() {
@@ -52,7 +66,7 @@ public:
         char buffer[1024];
 
         while (true) {
-            int n = epoll_wait(epoll_fd, events, 5, TIMEOUT_MS);
+            int n = epoll_wait(epoll_fd, events, 5, get_timeout_ms());
             
             if (n == 0) {
                 // 15min 兜底輪詢

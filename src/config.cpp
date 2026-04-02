@@ -14,6 +14,8 @@ void OmniConfig::reload() {
     std::ifstream file("/data/adb/omnisched/config.json");
     if (!file.is_open()) return;
 
+    current_config = OmniConfig{};
+
     json data = json::parse(file, nullptr, false);
     
     if (data.is_discarded()) {
@@ -35,5 +37,7 @@ void OmniConfig::reload() {
     if (data.contains("performance") && data["performance"].is_object()) {
         current_config.lite_mode =
             data["performance"].value("lite_mode", false);
+        current_config.auto_optimize =
+            data["performance"].value("auto_optimize", false);
     }
 }

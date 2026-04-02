@@ -6,6 +6,7 @@ struct OmniConfig {
     bool background_little_core_only = true;
     bool force_vulkan = false;
     bool lite_mode = false;
+    bool auto_optimize = false;
     
     static const OmniConfig& get();
     static void reload();

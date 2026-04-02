@@ -11,6 +11,14 @@
 #include <dirent.h>
 
 namespace {
+constexpr const char* AUTO_TOP_APP_UCLAMP_MIN = "20";
+constexpr const char* DEFAULT_TOP_APP_UCLAMP_MIN = "10";
+constexpr const char* LITE_TOP_APP_UCLAMP_MAX = "85";
+constexpr const char* DEFAULT_TOP_APP_UCLAMP_MAX = "max";
+constexpr const char* AUTO_BACKGROUND_UCLAMP_MAX = "35";
+constexpr const char* LITE_BACKGROUND_UCLAMP_MAX = "40";
+constexpr const char* DEFAULT_BACKGROUND_UCLAMP_MAX = "50";
+
 int get_android_api_level() {
     const std::string api = execute_command("getprop ro.build.version.sdk");
     return std::atoi(api.c_str());
@@ -79,12 +87,17 @@ void apply_core_optimizations() {
     const auto& topology = CpuTopology::get(); 
     const auto& config = OmniConfig::get();
     const auto& root = RootEnvironment::get_adapter();
+    const bool auto_optimize = config.auto_optimize;
+    const bool lite_mode = config.lite_mode && !auto_optimize;
+    const bool background_little_core_only = auto_optimize || config.background_little_core_only;
 
     apply_memory_optimizations();
 
     write_node("/dev/cpuset/top-app/cpus", topology.all_cores.c_str());
     
-    if (!topology.cluster_mid.empty() && topology.cluster_mid != topology.cluster_big) {
+    if (auto_optimize) {
+        write_node("/dev/cpuset/foreground/cpus", topology.all_cores.c_str());
+    } else if (!topology.cluster_mid.empty() && topology.cluster_mid != topology.cluster_big) {
         const std::string fg_cpus = combine_cpus(topology.cluster_little, topology.cluster_mid);
         write_node("/dev/cpuset/foreground/cpus", fg_cpus.c_str());
     } else {
@@ -94,30 +107,34 @@ void apply_core_optimizations() {
     const std::string sys_bg_cpus = combine_cpus(topology.cluster_little, topology.cluster_mid);
     write_node("/dev/cpuset/system-background/cpus", sys_bg_cpus.c_str());
 
-    if (config.background_little_core_only) {
+    if (background_little_core_only) {
         write_node("/dev/cpuset/background/cpus", topology.cluster_little.c_str());
     } else {
         write_node("/dev/cpuset/background/cpus", sys_bg_cpus.c_str());
     }
 
     if (path_exists("/dev/cpuset/top-app/uclamp.min")) {
-        if (config.lite_mode) {
-            write_node("/dev/cpuset/top-app/uclamp.max", "85");
+        if (lite_mode) {
+            write_node("/dev/cpuset/top-app/uclamp.max", LITE_TOP_APP_UCLAMP_MAX);
         } else {
-            write_node("/dev/cpuset/top-app/uclamp.max", "max");
+            write_node("/dev/cpuset/top-app/uclamp.max", DEFAULT_TOP_APP_UCLAMP_MAX);
         }
-        write_node("/dev/cpuset/top-app/uclamp.min", "10");
+        write_node("/dev/cpuset/top-app/uclamp.min",
+                   auto_optimize ? AUTO_TOP_APP_UCLAMP_MIN : DEFAULT_TOP_APP_UCLAMP_MIN);
 
-        if (config.lite_mode) {
-            write_node("/dev/cpuset/background/uclamp.max", "40");
-            write_node("/dev/cpuset/system-background/uclamp.max", "40");
+        if (auto_optimize) {
+            write_node("/dev/cpuset/background/uclamp.max", AUTO_BACKGROUND_UCLAMP_MAX);
+            write_node("/dev/cpuset/system-background/uclamp.max", AUTO_BACKGROUND_UCLAMP_MAX);
+        } else if (lite_mode) {
+            write_node("/dev/cpuset/background/uclamp.max", LITE_BACKGROUND_UCLAMP_MAX);
+            write_node("/dev/cpuset/system-background/uclamp.max", LITE_BACKGROUND_UCLAMP_MAX);
         } else {
-            write_node("/dev/cpuset/background/uclamp.max", "50");
-            write_node("/dev/cpuset/system-background/uclamp.max", "50");
+            write_node("/dev/cpuset/background/uclamp.max", DEFAULT_BACKGROUND_UCLAMP_MAX);
+            write_node("/dev/cpuset/system-background/uclamp.max", DEFAULT_BACKGROUND_UCLAMP_MAX);
         }
     }
 
-    if (!config.lite_mode && !topology.best_cpu_governor.empty()) {
+    if (!lite_mode && !topology.best_cpu_governor.empty()) {
         if (DIR* cpu_dir = opendir("/sys/devices/system/cpu/"); cpu_dir) {
             struct dirent* entry;
             while ((entry = readdir(cpu_dir)) != nullptr) {
@@ -131,7 +148,7 @@ void apply_core_optimizations() {
         }
     }
 
-    if (!config.lite_mode) {
+    if (!lite_mode) {
         const char* adreno_path = "/sys/class/kgsl/kgsl-3d0/devfreq/governor";
         if (path_exists(adreno_path)) {
             write_node(adreno_path, "msm-adreno-tz");
