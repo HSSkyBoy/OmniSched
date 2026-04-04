@@ -22,44 +22,29 @@ if [ -f "$CONFIG_FILE" ]; then
     FORCE_VULKAN_VALUE=$(grep -o '"force_vulkan"[[:space:]]*:[[:space:]]*\(true\|false\)' "$CONFIG_FILE" 2>/dev/null \
         | tail -n1 \
         | sed 's/.*:[[:space:]]*//')
-
-    if [ "$FORCE_VULKAN_VALUE" = "true" ]; then
-        FORCE_VULKAN=true
+    if [ "$FORCE_VULKAN_VALUE" = "false" ]; then
+        FORCE_VULKAN=false
     fi
 fi
 
-SOC_MAKER=$(getprop ro.soc.manufacturer)
-if [ "$FORCE_VULKAN" = "true" ]; then
-    if echo "$SOC_MAKER" | grep -qi "MediaTek\|MTK"; then
-        # 天璣 (MediaTek) 專屬
-        resetprop -n ro.hwui.renderer skiavk
-        resetprop -n debug.hwui.renderer skiavk
-        resetprop -n debug.renderengine.backend skiavk
-        resetprop -n ro.hwui.use_vulkan true
-        resetprop -n debug.renderengine.graphite false
-    else
-        # 常规 SoC 判斷
-        if [ "$A_API" -ge 34 ]; then
-            # Android 14~16
-            resetprop -n ro.hwui.renderer skia
-            resetprop -n debug.hwui.renderer skia
-            resetprop -n debug.renderengine.backend skiavk
-            resetprop -n ro.hwui.use_vulkan true
-            resetprop -n debug.renderengine.graphite true
-        else
-            # Android 12~13
-            resetprop -n ro.hwui.renderer skiavk
-            resetprop -n debug.hwui.renderer skiavk
-            resetprop -n debug.renderengine.backend skiavk
-            resetprop -n ro.hwui.use_vulkan true
-            resetprop -n debug.renderengine.graphite false
-        fi
-    fi
-
-    # Vulkan 強化
+# 渲染引擎行為
+if [ "$FORCE_VULKAN" = "false" ]; then
+    resetprop -n ro.hwui.renderer skia
+    resetprop -n debug.hwui.renderer skiagl
+    resetprop -n debug.renderengine.backend skiagl
+    resetprop -n ro.hwui.use_vulkan false
+    resetprop -n debug.renderengine.graphite true
+    resetprop -n debug.renderengine.vulkan.precompile.enabled false
+else
+    resetprop -n ro.hwui.renderer skiavk
+    resetprop -n debug.hwui.renderer skiavk
+    resetprop -n debug.renderengine.backend skiavk
+    resetprop -n ro.hwui.use_vulkan true
+    resetprop -n debug.renderengine.graphite false
+    resetprop -n debug.renderengine.vulkan.precompile.enabled true
+    
     resetprop -n debug.vulkan.layers ""
     resetprop -n debug.hwui.skia_tracing_enabled false
-    resetprop -n debug.renderengine.vulkan.precompile.enabled true
 fi
 
 # 設備底層屬性調優
