@@ -3,25 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    <title>OmniSched</title>
+    <title>Zygisk OmniSched</title>
     <style>
         :root{--bg:#05070b;--card:#151922e6;--line:#272d38;--txt:#edf2f7;--sub:#9aa4b2;--on:#2dbb63;--off:#3a4351;--danger:#ff4d4f}*{box-sizing:border-box}body{margin:0;padding:14px 12px 30px;font:14px/1.45 system-ui,sans-serif;color:var(--txt);background:linear-gradient(#0a0d12,#05070b);min-height:100vh}.c{max-width:560px;margin:auto;padding:18px;border:1px solid #ffffff12;border-radius:24px;background:var(--card);box-shadow:0 22px 56px rgba(0,0,0,.45);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}h1{margin:0;font-size:22px}p{margin:8px 0 0;color:var(--sub);font-size:13px}.r{display:flex;gap:12px;align-items:center;padding:14px 0;border-top:1px solid var(--line);flex-wrap:wrap}.k{flex:1;min-width:200px}.k b{display:block;font-size:15px}.k span{display:block;margin-top:4px;color:var(--sub);font-size:12px}.n{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.v{font-size:18px;font-weight:700;color:#5de08f}.d{opacity:.52;pointer-events:none}.sel-ui{padding:8px 12px;border-radius:8px;background:var(--off);color:var(--txt);border:1px solid var(--line);outline:0;font-size:13px;font-weight:700;cursor:pointer}.input-ui{flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--off);background:transparent;color:var(--txt);font-size:13px}.btn-ui{padding:8px 16px;border-radius:8px;background:var(--on);color:#000;border:0;font-weight:700;cursor:pointer;transition:.2s}.btn-ui:active{transform:scale(.95)}.app-item{display:flex;justify-content:space-between;align-items:center;background:#202632;padding:10px 14px;border-radius:8px;font-size:13px;margin-top:8px;border:1px solid var(--line)}.app-item button{background:transparent;color:var(--danger);border:0;cursor:pointer;font-weight:700;padding:4px 8px}.w{position:relative;width:50px;height:30px;flex:none}.w input{opacity:0;width:0;height:0;position:absolute}.w i{position:absolute;inset:0;border-radius:999px;background:var(--off);transition:.23s}.w i:before{content:"";position:absolute;left:4px;bottom:4px;width:22px;height:22px;border-radius:50%;background:#f8fafc;box-shadow:0 2px 8px rgba(0,0,0,.35);transition:.23s}input:checked+i{background:var(--on)}input:checked+i:before{transform:translateX(18px)}input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:999px;background:linear-gradient(to right,var(--on) var(--p,0%),#445062 var(--p,0%));outline:0}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#f8fafc;border:4px solid var(--on);box-shadow:0 4px 10px rgba(45,187,99,.28)}input[disabled],input[disabled]+i{cursor:not-allowed;filter:grayscale(.8)}.x{position:fixed;left:50%;bottom:30px;transform:translate(-50%,16px);padding:10px 16px;border-radius:999px;background:#0f131ad9;color:#f8fafc;font-size:13px;opacity:0;visibility:hidden;transition:.25s;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}.x.s{opacity:1;visibility:visible;transform:translate(-50%,0)}
     </style>
 </head>
 <body>
 <div class="c">
-    <h1>OmniSched 核心配置</h1>
-    <p>设置后立即热重载，无需重启设备。</p>
-    <div class="r" id="r_pow"><div class="k"><b>电源策略 (Power Policy)</b><span>动态调整 CPU 频率与算力钳制</span></div><select id="pow" class="sel-ui"><option value="powersave">🔋 节能模式</option><option value="balanced">⚖️ 平衡模式</option><option value="performance">🚀 效能模式</option></select></div>
-    <div class="r" id="r_vk"><div class="k"><b>Vulkan 渲染引擎</b><span>接管 HWUI 渲染后端 (Android 14+ 推荐)</span></div><select id="vk_mode" class="sel-ui"><option value="off">系统默认</option><option value="global">全局强制 Vulkan</option><option value="per_app">分应用 Vulkan (需 Zygisk)</option></select></div>
-    <div id="vk_app_mgr" style="display:none;padding:4px 0 14px;width:100%"><div style="display:flex;gap:8px"><input type="text" id="app_pkg" class="input-ui" placeholder="输入应用包名 (如: com.miHoYo.ys)"><button id="add_app" class="btn-ui">新增</button></div><div id="app_list"></div></div>
-    <div class="r"><div class="k"><b>自动效能最佳化</b><span>自动套用推荐配置并锁定部分选项</span></div><label class="w"><input id="a" type="checkbox"><i></i></label></div>
-    <div class="r" id="ri"><div class="k"><div class="n"><b>底层巡检间隔 (毫秒)</b><span class="v" id="iv">950</span></div><input id="p" type="range" min="300" max="3600" step="50" value="950"></div></div>
-    <div class="r" id="rb"><div class="k"><b>后台严格锁定小核</b><span>减少后台争抢并改善续航</span></div><label class="w"><input id="b" type="checkbox"><i></i></label></div>
+    <h1>OmniSched</h1>
+    <p>配置变更会直接写入模组目录，供进程级 Hook 与相容层共用。</p>
+    <div class="r" id="r_pow"><div class="k"><b>电源策略</b><span>调整 CPU 调度强度与背景限制。</span></div><select id="pow" class="sel-ui"><option value="powersave">🔋 节能模式</option><option value="balanced">⚖️ 平衡模式</option><option value="performance">🚀 性能模式</option></select></div>
+    <div class="r" id="r_vk"><div class="k"><b>Vulkan 模式</b><span>`per_app` 由 NeoZygisk 模组在 app specialize 前处理。</span></div><select id="vk_mode" class="sel-ui"><option value="off">系统默认</option><option value="global">全局强制</option><option value="per_app">分应用</option></select></div>
+    <div id="vk_app_mgr" style="display:none;padding:4px 0 14px;width:100%"><div style="display:flex;gap:8px"><input type="text" id="app_pkg" class="input-ui" placeholder="输入应用包名，例如 com.miHoYo.ys"><button id="add_app" class="btn-ui">新增</button></div><div id="app_list"></div></div>
+    <div class="r"><div class="k"><b>自动优化</b><span>启用后使用推荐的轮询与背景配置。</span></div><label class="w"><input id="a" type="checkbox"><i></i></label></div>
+    <div class="r" id="ri"><div class="k"><div class="n"><b>轮询间隔</b><span class="v" id="iv">950</span></div><input id="p" type="range" min="300" max="4000" step="50" value="950"></div></div>
+    <div class="r" id="rb"><div class="k"><b>背景限制小核</b><span>降低背景进程对前台的竞争。</span></div><label class="w"><input id="b" type="checkbox"><i></i></label></div>
 </div>
-<div class="x" id="t">设置已保存并生效</div>
+<div class="x" id="t">设定已储存</div>
 <script>
-    const P="/data/adb/omnisched/config.json",A={poll_interval_seconds:600,background_little_core_only:!0};let tm,s={poll_interval_seconds:950,cpuset:{background_little_core_only:!0},render:{vulkan_mode:"off",vulkan_apps:[]},power:{policy:"balanced"},performance:{lite_mode:!1,auto_optimize:!1}};const $=e=>document.getElementById(e),p=$("p"),iv=$("iv"),bg=$("b"),au=$("a"),ts=$("t"),pow=$("pow"),vkMode=$("vk_mode"),vkAppMgr=$("vk_app_mgr"),appList=$("app_list"),appPkg=$("app_pkg"),addApp=$("add_app"),rows=[p,bg,pow],fill=e=>e.style.setProperty("--p",`${(e.value-e.min)/(e.max-e.min)*100}%`),toast=()=>{clearTimeout(tm),ts.classList.add("s"),tm=setTimeout((()=>ts.classList.remove("s")),1700)},paint=()=>{const e=s.performance.auto_optimize;au.checked=e,p.value=e?A.poll_interval_seconds:s.poll_interval_seconds,iv.textContent=p.value,bg.checked=e?A.background_little_core_only:s.cpuset.background_little_core_only,fill(p),pow.value=s.power.policy,vkMode.value=s.render.vulkan_mode,vkAppMgr.style.display="per_app"===s.render.vulkan_mode?"block":"none",rows.forEach((o=>{o.disabled=e,o.closest(".r").classList.toggle("d",e)})),appList.innerHTML="",s.render.vulkan_apps.forEach(((e,o)=>{let a=document.createElement("div");a.className="app-item",a.innerHTML=`<span>${e}</span><button onclick="removeApp(${o})">移除</button>`,appList.appendChild(a)}))},save=async()=>{s.performance.auto_optimize&&(s.poll_interval_seconds=A.poll_interval_seconds,s.cpuset.background_little_core_only=A.background_little_core_only,s.power.policy="balanced"),await ksu.exec(`echo '${JSON.stringify(s)}' > ${P}`),toast(),paint()},load=async()=>{try{let e=await ksu.exec(`cat ${P}`),o=("string"==typeof e?e:e?.stdout||"").trim();if("{"===o[0]){let e=JSON.parse(o);s.poll_interval_seconds=e.poll_interval_seconds??950,s.cpuset.background_little_core_only=e.cpuset?.background_little_core_only??!0,s.performance.auto_optimize=e.performance?.auto_optimize??!1,"boolean"==typeof e.render?.force_vulkan?s.render.vulkan_mode=e.render.force_vulkan?"global":"off":s.render.vulkan_mode=e.render?.vulkan_mode??"off",s.render.vulkan_apps=e.render?.vulkan_apps??[],s.power.policy=e.power?.policy??"balanced"}}catch(e){}paint()};p.oninput=e=>{iv.textContent=e.target.value,fill(e.target)},p.onchange=()=>{s.poll_interval_seconds=parseInt(p.value,10),save()},bg.onchange=()=>{s.cpuset.background_little_core_only=bg.checked,save()},au.onchange=()=>{s.performance.auto_optimize=au.checked,save()},pow.onchange=()=>{s.power.policy=pow.value,save()},vkMode.onchange=()=>{s.render.vulkan_mode=vkMode.value,save()},addApp.onclick=()=>{const e=appPkg.value.trim();e&&!s.render.vulkan_apps.includes(e)&&(s.render.vulkan_apps.push(e),appPkg.value="",save())},window.removeApp=e=>{s.render.vulkan_apps.splice(e,1),save()},load();
+    const CONFIG_DIR = "/data/adb/zygisk_omnisched";
+    const CONFIG_PATH = `${CONFIG_DIR}/config.json`;
+    const AUTO = { poll_interval_seconds: 600, background_little_core_only: true };
+    let toastTimer;
+    let state = {
+        poll_interval_seconds: 950,
+        cpuset: { background_little_core_only: true },
+        render: { vulkan_mode: "off", vulkan_apps: [] },
+        power: { policy: "balanced" },
+        performance: { lite_mode: false, auto_optimize: false }
+    };
+    const $ = id => document.getElementById(id);
+    const poll = $("p");
+    const pollValue = $("iv");
+    const bg = $("b");
+    const autoOptimize = $("a");
+    const toastNode = $("t");
+    const power = $("pow");
+    const vkMode = $("vk_mode");
+    const vkAppMgr = $("vk_app_mgr");
+    const appList = $("app_list");
+    const appPkg = $("app_pkg");
+    const addApp = $("add_app");
+    const rows = [poll, bg, power];
+    const fill = node => node.style.setProperty("--p", `${(node.value - node.min) / (node.max - node.min) * 100}%`);
+    const toast = () => {
+        clearTimeout(toastTimer);
+        toastNode.classList.add("s");
+        toastTimer = setTimeout(() => toastNode.classList.remove("s"), 1700);
+    };
+    const paint = () => {
+        const locked = state.performance.auto_optimize;
+        autoOptimize.checked = locked;
+        poll.value = locked ? AUTO.poll_interval_seconds : state.poll_interval_seconds;
+        pollValue.textContent = poll.value;
+        bg.checked = locked ? AUTO.background_little_core_only : state.cpuset.background_little_core_only;
+        fill(poll);
+        power.value = state.power.policy;
+        vkMode.value = state.render.vulkan_mode;
+        vkAppMgr.style.display = state.render.vulkan_mode === "per_app" ? "block" : "none";
+        rows.forEach(node => {
+            node.disabled = locked;
+            node.closest(".r").classList.toggle("d", locked);
+        });
+        appList.innerHTML = "";
+        state.render.vulkan_apps.forEach((pkg, index) => {
+            const item = document.createElement("div");
+            item.className = "app-item";
+            item.innerHTML = `<span>${pkg}</span><button onclick="removeApp(${index})">移除</button>`;
+            appList.appendChild(item);
+        });
+    };
+    const save = async () => {
+        if (state.performance.auto_optimize) {
+            state.poll_interval_seconds = AUTO.poll_interval_seconds;
+            state.cpuset.background_little_core_only = AUTO.background_little_core_only;
+            state.power.policy = "balanced";
+        }
+        await ksu.exec(`mkdir -p ${CONFIG_DIR} && echo '${JSON.stringify(state)}' > ${CONFIG_PATH}`);
+        toast();
+        paint();
+    };
+    const load = async () => {
+        try {
+            const result = await ksu.exec(`cat ${CONFIG_PATH}`);
+            const raw = (typeof result === "string" ? result : result?.stdout || "").trim();
+            if (raw[0] === "{") {
+                const parsed = JSON.parse(raw);
+                state.poll_interval_seconds = parsed.poll_interval_seconds ?? 950;
+                state.cpuset.background_little_core_only = parsed.cpuset?.background_little_core_only ?? true;
+                state.performance.auto_optimize = parsed.performance?.auto_optimize ?? false;
+                state.performance.lite_mode = parsed.performance?.lite_mode ?? false;
+                state.render.vulkan_mode = typeof parsed.render?.force_vulkan === "boolean"
+                    ? (parsed.render.force_vulkan ? "global" : "off")
+                    : (parsed.render?.vulkan_mode ?? "off");
+                state.render.vulkan_apps = parsed.render?.vulkan_apps ?? [];
+                state.power.policy = parsed.power?.policy ?? "balanced";
+            }
+        } catch (_) {}
+        paint();
+    };
+    poll.oninput = event => { pollValue.textContent = event.target.value; fill(event.target); };
+    poll.onchange = () => { state.poll_interval_seconds = parseInt(poll.value, 10); save(); };
+    bg.onchange = () => { state.cpuset.background_little_core_only = bg.checked; save(); };
+    autoOptimize.onchange = () => { state.performance.auto_optimize = autoOptimize.checked; save(); };
+    power.onchange = () => { state.power.policy = power.value; save(); };
+    vkMode.onchange = () => { state.render.vulkan_mode = vkMode.value; save(); };
+    addApp.onclick = () => {
+        const pkg = appPkg.value.trim();
+        if (pkg && !state.render.vulkan_apps.includes(pkg)) {
+            state.render.vulkan_apps.push(pkg);
+            appPkg.value = "";
+            save();
+        }
+    };
+    window.removeApp = index => { state.render.vulkan_apps.splice(index, 1); save(); };
+    load();
 </script>
 </body>
 </html>

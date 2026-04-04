@@ -1,6 +1,6 @@
-id=omnisched
-name=OmniSched
-version=v3.1.4
-versionCode=36
+id=zygisk_omnisched
+name=Zygisk OmniSched
+version=v4.0.0
+versionCode=40
 author=HSSkyBoy & @nikobe918
-description=安卓通用底層調度模組。採用 C++ 事件驅動與零開銷常駐，支援 WebUI 熱重載。新增三段式電源策略（節能/平衡/效能）與分應用 Vulkan 管理架構，深度優化 Android 14+ 算力鉗制與渲染性能。
+description=基於 NeoZygisk 的 Android 調度和 Vulkan 優化模組。

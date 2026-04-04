@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.30.1)
-project(OmniSchedv3 CXX)
+project(zygisk_omnisched CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -flto -fvisibility=hidden -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti")
+set(COMMON_CXX_FLAGS "-Os -flto -fvisibility=hidden -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMMON_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections -s -flto")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -s -flto")
 
 include_directories(include)
 
@@ -15,7 +17,24 @@ FetchContent_Declare(json
 )
 FetchContent_MakeAvailable(json)
 
-file(GLOB SOURCES "src/*.cpp")
+set(OMNISCHED_DAEMON_SOURCES
+    src/config.cpp
+    src/core_sched.cpp
+    src/main.cpp
+    src/root_adapter.cpp
+    src/utils.cpp
+)
 
-add_executable(omnisched ${SOURCES})
-target_link_libraries(omnisched PRIVATE nlohmann_json::nlohmann_json)
+set(OMNISCHED_ZYGISK_SOURCES
+    src/config.cpp
+    src/utils.cpp
+    src/zygisk_main.cpp
+)
+
+add_executable(omnisched_daemon ${OMNISCHED_DAEMON_SOURCES})
+target_link_libraries(omnisched_daemon PRIVATE nlohmann_json::nlohmann_json)
+set_target_properties(omnisched_daemon PROPERTIES OUTPUT_NAME "omnisched")
+
+add_library(zygisk_omnisched SHARED ${OMNISCHED_ZYGISK_SOURCES})
+target_link_libraries(zygisk_omnisched PRIVATE nlohmann_json::nlohmann_json)
+set_target_properties(zygisk_omnisched PROPERTIES PREFIX "" OUTPUT_NAME "arm64-v8a")

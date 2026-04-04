@@ -1,16 +1,18 @@
 #pragma once
 
+#include <algorithm>
+#include <chrono>
 #include <functional>
-#include <vector>
 #include <string>
 #include <sys/epoll.h>
 #include <sys/inotify.h>
-#include <unistd.h>
 #include <thread>
-#include <chrono>
-#include <algorithm>
+#include <unistd.h>
+#include <vector>
+
 #include "config.h"
 #include "cpu_topology.h"
+#include "project_paths.h"
 #include "utils.h"
 
 class SchedEventFlow {
@@ -47,19 +49,21 @@ public:
     SchedEventFlow() {
         epoll_fd = epoll_create1(0);
         inotify_fd = inotify_init1(IN_NONBLOCK);
-        
+
         epoll_event ev{};
         ev.events = EPOLLIN;
         ev.data.fd = inotify_fd;
         epoll_ctl(epoll_fd, EPOLL_CTL_ADD, inotify_fd, &ev);
-        
-        const std::vector<std::string> target_nodes = {
+
+        std::vector<std::string> target_nodes = {
             "/dev/cpuset/top-app/cpus",
             "/dev/cpuset/background/cpus",
-            "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor",
-            "/data/adb/omnisched/config.json"
+            "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor"
         };
-        
+        for (const auto& config_path : omnisched::config_path_candidates()) {
+            target_nodes.push_back(config_path);
+        }
+
         for (const auto& node : target_nodes) {
             int wd = inotify_add_watch(inotify_fd, node.c_str(), IN_MODIFY | IN_ATTRIB);
             if (wd >= 0) watch_descriptors.push_back(wd);
@@ -80,15 +84,13 @@ public:
 
         while (true) {
             int n = epoll_wait(epoll_fd, events, 5, get_timeout_ms());
-            
+
             if (n == 0) {
-                // 定期重新应用调度器设置。
                 action();
             } else if (n > 0) {
                 while (read(inotify_fd, buffer, sizeof(buffer)) > 0) {}
-                
-                action();
 
+                action();
                 std::this_thread::sleep_for(std::chrono::seconds(3));
             }
         }

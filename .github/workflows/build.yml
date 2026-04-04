@@ -1,4 +1,4 @@
-name: Build OmniSched v3
+name: Build Zygisk OmniSched
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: omnisched-build-${{ github.ref }}
+  group: zygisk-omnisched-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,24 +60,26 @@ jobs:
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-31 \
             -DANDROID_STL=c++_static
-          
+
           cmake --build build --config Release --parallel $(nproc)
 
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip build/arm64-v8a.so
           $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip build/omnisched
 
-          mkdir -p out/system/bin
-          cp build/omnisched out/system/bin/
+          mkdir -p out/zygisk
+          mkdir -p out/bin
+          cp build/arm64-v8a.so out/zygisk/arm64-v8a.so
+          cp build/omnisched out/bin/omnisched
           cp module.prop customize.sh out/
-          # 這裡假設你的原始目錄結構
-          [ -d module ] && cp -r module/* out/ 
+          cp module/post-fs-data.sh out/
+          cp module/service.sh out/
           [ -d webroot ] && cp -r webroot out/
-          [ -d META-INF ] && cp -r META-INF out/
 
           cd out
-          zip -r9 "../OmniSched-v${MODULE_VERSION}.zip" .
+          zip -r9 "../zygisk_omnisched-v${MODULE_VERSION}.zip" .
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OmniSched-v${{ steps.module_version.outputs.value }}-${{ github.run_number }}
-          path: OmniSched-v${{ steps.module_version.outputs.value }}.zip
+          name: zygisk_omnisched-v${{ steps.module_version.outputs.value }}-${{ github.run_number }}
+          path: zygisk_omnisched-v${{ steps.module_version.outputs.value }}.zip
