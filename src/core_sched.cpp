@@ -32,6 +32,13 @@ namespace {
         const char* background_uclamp_max;
     };
 
+    std::string first_non_empty(std::initializer_list<std::string> values) {
+        for (const auto& value : values) {
+            if (!value.empty()) return value;
+        }
+        return {};
+    }
+
     int get_android_api_level() {
         const std::string api = execute_command("getprop ro.build.version.sdk");
         return std::atoi(api.c_str());
@@ -46,10 +53,22 @@ namespace {
     }
 
     std::string resolve_system_background_cpus(const CpuTopology& topology) {
-        std::string sys_bg = combine_cpus(topology.cluster_little, topology.cluster_mid);
-        if (sys_bg.empty()) sys_bg = topology.cluster_little;
-        if (sys_bg.empty()) sys_bg = topology.all_cores;
-        return sys_bg;
+        return first_non_empty({
+            combine_cpus(topology.cluster_little, topology.cluster_mid),
+            topology.cluster_little,
+            topology.cluster_mid,
+            topology.all_cores
+        });
+    }
+
+    std::string resolve_background_cpus(const CpuTopology& topology, bool little_core_only) {
+        const std::string system_background_cpus = resolve_system_background_cpus(topology);
+        if (!little_core_only) return system_background_cpus;
+        return first_non_empty({
+            topology.cluster_little,
+            system_background_cpus,
+            topology.all_cores
+        });
     }
 
     const char* pick_auto_top_app_uclamp_min(int cpu_count, bool dedicated_big_cluster) {
@@ -75,11 +94,9 @@ namespace {
         if (cpu_count >= 8 && dedicated_big_cluster && dedicated_mid_cluster) {
             foreground_cpus = combine_cpus(topology.cluster_little, topology.cluster_mid);
         }
-        if (foreground_cpus.empty()) foreground_cpus = topology.all_cores;
+        if (foreground_cpus.empty()) foreground_cpus = first_non_empty({topology.cluster_mid, topology.all_cores});
 
-        std::string background_cpus = topology.cluster_little.empty()
-                                      ? system_background_cpus
-                                      : topology.cluster_little;
+        std::string background_cpus = resolve_background_cpus(topology, true);
 
         return AutoOptimizeProfile{
                 foreground_cpus,
@@ -155,17 +172,25 @@ void apply_core_optimizations() {
     apply_memory_optimizations();
 
     write_node("/dev/cpuset/top-app/cpus", topology.all_cores.c_str());
+    const std::string system_background_cpus = resolve_system_background_cpus(topology);
+    const std::string strict_background_cpus = resolve_background_cpus(topology, true);
+    const std::string relaxed_background_cpus = resolve_background_cpus(topology, false);
+
     if (config.power_policy == PowerPolicy::PERFORMANCE) {
         write_node("/dev/cpuset/foreground/cpus", topology.all_cores.c_str());
         write_node("/dev/cpuset/system-background/cpus", topology.all_cores.c_str());
-        write_node("/dev/cpuset/background/cpus", combine_cpus(topology.cluster_little, topology.cluster_mid).c_str());
+        write_node("/dev/cpuset/background/cpus", relaxed_background_cpus.c_str());
     } else if (config.power_policy == PowerPolicy::POWERSAVE) {
-        std::string fg_save_cpus = combine_cpus(topology.cluster_little, topology.cluster_mid);
-        if (fg_save_cpus.empty()) fg_save_cpus = topology.cluster_little;
+        std::string fg_save_cpus = first_non_empty({
+            combine_cpus(topology.cluster_little, topology.cluster_mid),
+            topology.cluster_little,
+            system_background_cpus,
+            topology.all_cores
+        });
 
         write_node("/dev/cpuset/foreground/cpus", fg_save_cpus.c_str());
-        write_node("/dev/cpuset/system-background/cpus", topology.cluster_little.c_str());
-        write_node("/dev/cpuset/background/cpus", topology.cluster_little.c_str());
+        write_node("/dev/cpuset/system-background/cpus", strict_background_cpus.c_str());
+        write_node("/dev/cpuset/background/cpus", strict_background_cpus.c_str());
     } else { // BALANCED
         if (config.auto_optimize) {
             const auto auto_profile = build_auto_optimize_profile(topology);
@@ -174,8 +199,11 @@ void apply_core_optimizations() {
             write_node("/dev/cpuset/background/cpus", auto_profile.background_cpus.c_str());
         } else {
             write_node("/dev/cpuset/foreground/cpus", topology.all_cores.c_str());
-            write_node("/dev/cpuset/system-background/cpus", combine_cpus(topology.cluster_little, topology.cluster_mid).c_str());
-            write_node("/dev/cpuset/background/cpus", config.background_little_core_only ? topology.cluster_little.c_str() : combine_cpus(topology.cluster_little, topology.cluster_mid).c_str());
+            write_node("/dev/cpuset/system-background/cpus", system_background_cpus.c_str());
+            write_node(
+                "/dev/cpuset/background/cpus",
+                (config.background_little_core_only ? strict_background_cpus : relaxed_background_cpus).c_str()
+            );
         }
     }
 
