@@ -172,6 +172,8 @@
         .input-ui {
             width: 100%;
             min-width: 0;
+            min-height: 38px;
+            padding: 6px 9px;
             color: var(--txt);
             background: #101110;
         }
@@ -444,6 +446,30 @@
             <div class="k"><b id="lite_title"></b></div>
             <label class="w" for="lite_mode"><input id="lite_mode" type="checkbox" aria-labelledby="lite_title"><i></i></label>
         </div>
+        <div class="r">
+            <div class="stack">
+                <label class="input-label" for="governor_override" id="governor_label">CPU Governor Override</label>
+                <input id="governor_override" class="input-ui" type="text" spellcheck="false">
+            </div>
+        </div>
+        <div class="r">
+            <div class="stack">
+                <label class="input-label" for="top_app_uclamp_min" id="top_uclamp_label">Top-app Uclamp Min (-1 auto)</label>
+                <input id="top_app_uclamp_min" class="input-ui" type="number" min="-1" max="100" step="1">
+            </div>
+        </div>
+        <div class="r">
+            <div class="stack">
+                <label class="input-label" for="input_boost_ms" id="input_boost_ms_label">Input Boost Duration (-1 auto)</label>
+                <input id="input_boost_ms" class="input-ui" type="number" min="-1" max="5000" step="10">
+            </div>
+        </div>
+        <div class="r">
+            <div class="stack">
+                <label class="input-label" for="thermal_throttle_temp" id="thermal_temp_label">Thermal Guard Temp C (-1 auto)</label>
+                <input id="thermal_throttle_temp" class="input-ui" type="number" min="-1" max="95" step="1">
+            </div>
+        </div>
     </section>
 </main>
 <div class="x" id="toast" aria-live="polite">Saved</div>
@@ -468,6 +494,18 @@
             gpu_tune: true,
             input_boost: true,
             thermal_guard: true
+        },
+        scheduler: {
+            top_app_uclamp_min: -1
+        },
+        cpu: {
+            governor_override: ""
+        },
+        input: {
+            boost_ms: -1
+        },
+        thermal: {
+            throttle_temp_c: -1
         }
     });
     const AUTO_PROFILE = Object.freeze({
@@ -598,6 +636,10 @@
     const backgroundLittle = $("background_little");
     const liteMode = $("lite_mode");
     const appInput = $("app_pkg");
+    const governorOverride = $("governor_override");
+    const topAppUclampMin = $("top_app_uclamp_min");
+    const inputBoostMs = $("input_boost_ms");
+    const thermalThrottleTemp = $("thermal_throttle_temp");
     const configPathNode = $("config_path");
     const configSourceNode = $("config_source");
     const vkManager = $("vk_app_mgr");
@@ -667,6 +709,10 @@
         $("poll_title").textContent = text.pollTitle;
         $("bg_title").textContent = text.bgTitle;
         $("lite_title").textContent = text.liteTitle;
+        $("governor_label").textContent = "CPU Governor Override";
+        $("top_uclamp_label").textContent = "Top-app Uclamp Min (-1 auto)";
+        $("input_boost_ms_label").textContent = "Input Boost Duration (-1 auto)";
+        $("thermal_temp_label").textContent = "Thermal Guard Temp C (-1 auto)";
         $("reload_now").textContent = text.reloadNow;
         $("save_now").textContent = text.saveNow;
         $("reset_defaults").textContent = text.resetDefaults;
@@ -755,6 +801,13 @@
         return allowed.includes(value) ? value : fallback;
     }
 
+    function readOptionalInt(value, fallback, min, max) {
+        const trimmed = String(value ?? "").trim();
+        if (trimmed === "") return fallback;
+        if (trimmed === "-1" && min <= -1) return -1;
+        return clampNumber(trimmed, fallback, min, max);
+    }
+
     function normalizeConfig(input) {
         const next = clone(DEFAULT_STATE);
         const data = input && typeof input === "object" ? input : {};
@@ -790,6 +843,28 @@
             typeof performance.input_boost === "boolean" ? performance.input_boost : next.performance.input_boost;
         next.performance.thermal_guard =
             typeof performance.thermal_guard === "boolean" ? performance.thermal_guard : next.performance.thermal_guard;
+        next.scheduler.top_app_uclamp_min = readOptionalInt(
+            data.scheduler && typeof data.scheduler === "object" ? data.scheduler.top_app_uclamp_min : next.scheduler.top_app_uclamp_min,
+            next.scheduler.top_app_uclamp_min,
+            -1,
+            100
+        );
+        next.cpu.governor_override =
+            data.cpu && typeof data.cpu === "object" && typeof data.cpu.governor_override === "string"
+                ? data.cpu.governor_override.trim()
+                : next.cpu.governor_override;
+        next.input.boost_ms = readOptionalInt(
+            data.input && typeof data.input === "object" ? data.input.boost_ms : next.input.boost_ms,
+            next.input.boost_ms,
+            -1,
+            5000
+        );
+        next.thermal.throttle_temp_c = readOptionalInt(
+            data.thermal && typeof data.thermal === "object" ? data.thermal.throttle_temp_c : next.thermal.throttle_temp_c,
+            next.thermal.throttle_temp_c,
+            -1,
+            95
+        );
 
         if (typeof render.force_vulkan === "boolean") {
             next.render.vulkan_mode = render.force_vulkan ? "global" : "off";
@@ -833,6 +908,8 @@
             persisted.power.policy = AUTO_PROFILE.power_policy;
         }
 
+        persisted.cpu.governor_override = persisted.cpu.governor_override.trim();
+
         return persisted;
     }
 
@@ -868,6 +945,10 @@
         pollValue.textContent = displayedPoll;
         backgroundLittle.checked = displayedBackground;
         liteMode.checked = state.performance.lite_mode;
+        governorOverride.value = state.cpu.governor_override;
+        topAppUclampMin.value = state.scheduler.top_app_uclamp_min;
+        inputBoostMs.value = state.input.boost_ms;
+        thermalThrottleTemp.value = state.thermal.throttle_temp_c;
         powerPolicy.value = effectivePowerPolicy();
         vulkanMode.value = state.render.vulkan_mode;
         vkManager.hidden = state.render.vulkan_mode !== "per_app";
@@ -946,6 +1027,22 @@
     };
     liteMode.onchange = () => {
         state.performance.lite_mode = liteMode.checked;
+        saveConfig();
+    };
+    governorOverride.onchange = () => {
+        state.cpu.governor_override = governorOverride.value.trim();
+        saveConfig();
+    };
+    topAppUclampMin.onchange = () => {
+        state.scheduler.top_app_uclamp_min = readOptionalInt(topAppUclampMin.value, -1, -1, 100);
+        saveConfig();
+    };
+    inputBoostMs.onchange = () => {
+        state.input.boost_ms = readOptionalInt(inputBoostMs.value, -1, -1, 5000);
+        saveConfig();
+    };
+    thermalThrottleTemp.onchange = () => {
+        state.thermal.throttle_temp_c = readOptionalInt(thermalThrottleTemp.value, -1, -1, 95);
         saveConfig();
     };
     autoOptimize.onchange = () => {
