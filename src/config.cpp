@@ -1,5 +1,6 @@
 #include "config.h"
 #include "project_paths.h"
+#include "utils.h"
 #include <algorithm>
 #include <fstream>
 #include <unordered_set>
@@ -26,6 +27,16 @@ std::ifstream open_first_available_config() {
         file.clear();
     }
     return file;
+}
+
+int read_clamped_int(const json& node, const char* key, int fallback, int min_value, int max_value) {
+    if (!node.contains(key) || !node[key].is_number_integer()) return fallback;
+    return std::clamp(node[key].get<int>(), min_value, max_value);
+}
+
+std::string read_cpuset_value(const json& node, const char* key) {
+    if (!node.contains(key) || !node[key].is_string()) return {};
+    return normalize_cpuset(trim_copy(node[key].get<std::string>()));
 }
 
 }  // namespace
@@ -92,5 +103,53 @@ void OmniConfig::reload() {
         current_config.gpu_tune = perfNode.value("gpu_tune", true);
         current_config.input_boost = perfNode.value("input_boost", true);
         current_config.thermal_guard = perfNode.value("thermal_guard", true);
+    }
+
+    if (data.contains("scheduler") && data["scheduler"].is_object()) {
+        const auto& scheduler_node = data["scheduler"];
+        current_config.scheduler.top_app_uclamp_min =
+            read_clamped_int(scheduler_node, "top_app_uclamp_min", current_config.scheduler.top_app_uclamp_min, 0, 100);
+        current_config.scheduler.foreground_uclamp_min =
+            read_clamped_int(scheduler_node, "foreground_uclamp_min", current_config.scheduler.foreground_uclamp_min, 0, 100);
+        current_config.scheduler.background_uclamp_max =
+            read_clamped_int(scheduler_node, "background_uclamp_max", current_config.scheduler.background_uclamp_max, 0, 100);
+        current_config.scheduler.schedutil_up_rate_limit_us =
+            read_clamped_int(scheduler_node, "schedutil_up_rate_limit_us", current_config.scheduler.schedutil_up_rate_limit_us, 0, 100000);
+        current_config.scheduler.schedutil_down_rate_limit_us =
+            read_clamped_int(scheduler_node, "schedutil_down_rate_limit_us", current_config.scheduler.schedutil_down_rate_limit_us, 0, 100000);
+        current_config.scheduler.schedutil_iowait_boost =
+            read_clamped_int(scheduler_node, "schedutil_iowait_boost", current_config.scheduler.schedutil_iowait_boost, 0, 1);
+    }
+
+    if (data.contains("cpu") && data["cpu"].is_object()) {
+        const auto& cpu_node = data["cpu"];
+        if (cpu_node.contains("governor_override") && cpu_node["governor_override"].is_string()) {
+            current_config.cpu.governor_override = trim_copy(cpu_node["governor_override"].get<std::string>());
+        }
+        current_config.cpu.foreground_cpuset = read_cpuset_value(cpu_node, "foreground_cpuset");
+        current_config.cpu.system_background_cpuset = read_cpuset_value(cpu_node, "system_background_cpuset");
+        current_config.cpu.background_cpuset = read_cpuset_value(cpu_node, "background_cpuset");
+        current_config.cpu.scaling_min_freq_khz =
+            read_clamped_int(cpu_node, "scaling_min_freq_khz", current_config.cpu.scaling_min_freq_khz, 0, 10000000);
+        current_config.cpu.scaling_max_freq_khz =
+            read_clamped_int(cpu_node, "scaling_max_freq_khz", current_config.cpu.scaling_max_freq_khz, 0, 10000000);
+    }
+
+    if (data.contains("input") && data["input"].is_object()) {
+        const auto& input_node = data["input"];
+        current_config.input.boost_ms =
+            read_clamped_int(input_node, "boost_ms", current_config.input.boost_ms, 0, 5000);
+    }
+
+    if (data.contains("thermal") && data["thermal"].is_object()) {
+        const auto& thermal_node = data["thermal"];
+        current_config.thermal.throttle_temp_c =
+            read_clamped_int(thermal_node, "throttle_temp_c", current_config.thermal.throttle_temp_c, 30, 95);
+        current_config.thermal.top_app_uclamp_max =
+            read_clamped_int(thermal_node, "top_app_uclamp_max", current_config.thermal.top_app_uclamp_max, 0, 100);
+        current_config.thermal.foreground_uclamp_max =
+            read_clamped_int(thermal_node, "foreground_uclamp_max", current_config.thermal.foreground_uclamp_max, 0, 100);
+        current_config.thermal.background_uclamp_max =
+            read_clamped_int(thermal_node, "background_uclamp_max", current_config.thermal.background_uclamp_max, 0, 100);
     }
 }
