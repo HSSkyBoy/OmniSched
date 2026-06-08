@@ -27,7 +27,13 @@ write_default_config() {
   },
   "performance": {
     "auto_optimize": false,
-    "lite_mode": false
+    "lite_mode": false,
+    "scheduler_tune": true,
+    "memory_tune": true,
+    "io_tune": true,
+    "gpu_tune": true,
+    "input_boost": true,
+    "thermal_guard": true
   }
 }
 EOF

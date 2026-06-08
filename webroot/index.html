@@ -396,6 +396,30 @@
             <label class="w" for="auto_optimize"><input id="auto_optimize" type="checkbox" aria-labelledby="auto_title"><i></i></label>
         </div>
         <div class="r">
+            <div class="k"><b id="scheduler_title"></b></div>
+            <label class="w" for="scheduler_tune"><input id="scheduler_tune" type="checkbox" aria-labelledby="scheduler_title"><i></i></label>
+        </div>
+        <div class="r">
+            <div class="k"><b id="memory_title"></b></div>
+            <label class="w" for="memory_tune"><input id="memory_tune" type="checkbox" aria-labelledby="memory_title"><i></i></label>
+        </div>
+        <div class="r">
+            <div class="k"><b id="io_title"></b></div>
+            <label class="w" for="io_tune"><input id="io_tune" type="checkbox" aria-labelledby="io_title"><i></i></label>
+        </div>
+        <div class="r">
+            <div class="k"><b id="gpu_title"></b></div>
+            <label class="w" for="gpu_tune"><input id="gpu_tune" type="checkbox" aria-labelledby="gpu_title"><i></i></label>
+        </div>
+        <div class="r">
+            <div class="k"><b id="input_title"></b></div>
+            <label class="w" for="input_boost"><input id="input_boost" type="checkbox" aria-labelledby="input_title"><i></i></label>
+        </div>
+        <div class="r">
+            <div class="k"><b id="thermal_title"></b></div>
+            <label class="w" for="thermal_guard"><input id="thermal_guard" type="checkbox" aria-labelledby="thermal_title"><i></i></label>
+        </div>
+        <div class="r">
             <div class="k"><b id="vk_title"></b></div>
             <select id="vk_mode" class="sel-ui" aria-labelledby="vk_title"></select>
             <div id="vk_app_mgr" class="stack" hidden>
@@ -435,7 +459,16 @@
         cpuset: { background_little_core_only: true },
         render: { vulkan_mode: "off", vulkan_apps: [] },
         power: { policy: "balanced" },
-        performance: { lite_mode: false, auto_optimize: false }
+        performance: {
+            lite_mode: false,
+            auto_optimize: false,
+            scheduler_tune: true,
+            memory_tune: true,
+            io_tune: true,
+            gpu_tune: true,
+            input_boost: true,
+            thermal_guard: true
+        }
     });
     const AUTO_PROFILE = Object.freeze({
         poll_interval_seconds: 600,
@@ -453,6 +486,12 @@
             appListLabel: "分應用套件名",
             appPlaceholder: "每行一個套件名，例如：\ncom.miHoYo.ys\ncom.example.game",
             autoTitle: "智慧自動最佳化",
+            schedulerTitle: "調度優化",
+            memoryTitle: "記憶體調校",
+            ioTitle: "I/O 佇列調校",
+            gpuTitle: "GPU 調校",
+            inputTitle: "觸控 Boost",
+            thermalTitle: "溫控保護",
             pollTitle: "兜底巡檢間隔",
             bgTitle: "背景小核限制",
             liteTitle: "Lite 模式",
@@ -480,6 +519,12 @@
             appListLabel: "分应用包名",
             appPlaceholder: "每行一个包名，例如：\ncom.miHoYo.ys\ncom.example.game",
             autoTitle: "智能自动优化",
+            schedulerTitle: "调度优化",
+            memoryTitle: "内存调校",
+            ioTitle: "I/O 队列调校",
+            gpuTitle: "GPU 调校",
+            inputTitle: "触控 Boost",
+            thermalTitle: "温控保护",
             pollTitle: "兜底巡检间隔",
             bgTitle: "后台小核限制",
             liteTitle: "Lite 模式",
@@ -507,6 +552,12 @@
             appListLabel: "Per-app package names",
             appPlaceholder: "One package name per line, for example:\ncom.miHoYo.ys\ncom.example.game",
             autoTitle: "Smart Auto Optimize",
+            schedulerTitle: "Scheduler Tuning",
+            memoryTitle: "Memory Tuning",
+            ioTitle: "I/O Queue Tuning",
+            gpuTitle: "GPU Tuning",
+            inputTitle: "Input Boost",
+            thermalTitle: "Thermal Guard",
             pollTitle: "Fallback Poll Interval",
             bgTitle: "Background Little-Core Limit",
             liteTitle: "Lite Mode",
@@ -538,6 +589,12 @@
     const powerPolicy = $("power");
     const vulkanMode = $("vk_mode");
     const autoOptimize = $("auto_optimize");
+    const schedulerTune = $("scheduler_tune");
+    const memoryTune = $("memory_tune");
+    const ioTune = $("io_tune");
+    const gpuTune = $("gpu_tune");
+    const inputBoost = $("input_boost");
+    const thermalGuard = $("thermal_guard");
     const backgroundLittle = $("background_little");
     const liteMode = $("lite_mode");
     const appInput = $("app_pkg");
@@ -601,6 +658,12 @@
         $("power_title").textContent = text.powerTitle;
         $("vk_title").textContent = text.vkTitle;
         $("auto_title").textContent = text.autoTitle;
+        $("scheduler_title").textContent = text.schedulerTitle;
+        $("memory_title").textContent = text.memoryTitle;
+        $("io_title").textContent = text.ioTitle;
+        $("gpu_title").textContent = text.gpuTitle;
+        $("input_title").textContent = text.inputTitle;
+        $("thermal_title").textContent = text.thermalTitle;
         $("poll_title").textContent = text.pollTitle;
         $("bg_title").textContent = text.bgTitle;
         $("lite_title").textContent = text.liteTitle;
@@ -715,6 +778,18 @@
             typeof performance.auto_optimize === "boolean" ? performance.auto_optimize : next.performance.auto_optimize;
         next.performance.lite_mode =
             typeof performance.lite_mode === "boolean" ? performance.lite_mode : next.performance.lite_mode;
+        next.performance.scheduler_tune =
+            typeof performance.scheduler_tune === "boolean" ? performance.scheduler_tune : next.performance.scheduler_tune;
+        next.performance.memory_tune =
+            typeof performance.memory_tune === "boolean" ? performance.memory_tune : next.performance.memory_tune;
+        next.performance.io_tune =
+            typeof performance.io_tune === "boolean" ? performance.io_tune : next.performance.io_tune;
+        next.performance.gpu_tune =
+            typeof performance.gpu_tune === "boolean" ? performance.gpu_tune : next.performance.gpu_tune;
+        next.performance.input_boost =
+            typeof performance.input_boost === "boolean" ? performance.input_boost : next.performance.input_boost;
+        next.performance.thermal_guard =
+            typeof performance.thermal_guard === "boolean" ? performance.thermal_guard : next.performance.thermal_guard;
 
         if (typeof render.force_vulkan === "boolean") {
             next.render.vulkan_mode = render.force_vulkan ? "global" : "off";
@@ -783,6 +858,12 @@
         const displayedBackground = locked ? AUTO_PROFILE.background_little_core_only : state.cpuset.background_little_core_only;
 
         autoOptimize.checked = locked;
+        schedulerTune.checked = state.performance.scheduler_tune;
+        memoryTune.checked = state.performance.memory_tune;
+        ioTune.checked = state.performance.io_tune;
+        gpuTune.checked = state.performance.gpu_tune;
+        inputBoost.checked = state.performance.input_boost;
+        thermalGuard.checked = state.performance.thermal_guard;
         pollSlider.value = displayedPoll;
         pollValue.textContent = displayedPoll;
         backgroundLittle.checked = displayedBackground;
@@ -869,6 +950,30 @@
     };
     autoOptimize.onchange = () => {
         state.performance.auto_optimize = autoOptimize.checked;
+        saveConfig();
+    };
+    schedulerTune.onchange = () => {
+        state.performance.scheduler_tune = schedulerTune.checked;
+        saveConfig();
+    };
+    memoryTune.onchange = () => {
+        state.performance.memory_tune = memoryTune.checked;
+        saveConfig();
+    };
+    ioTune.onchange = () => {
+        state.performance.io_tune = ioTune.checked;
+        saveConfig();
+    };
+    gpuTune.onchange = () => {
+        state.performance.gpu_tune = gpuTune.checked;
+        saveConfig();
+    };
+    inputBoost.onchange = () => {
+        state.performance.input_boost = inputBoost.checked;
+        saveConfig();
+    };
+    thermalGuard.onchange = () => {
+        state.performance.thermal_guard = thermalGuard.checked;
         saveConfig();
     };
     powerPolicy.onchange = () => {

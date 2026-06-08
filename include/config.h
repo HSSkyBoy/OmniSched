@@ -15,6 +15,12 @@ struct OmniConfig {
     bool background_little_core_only = true;
     bool auto_optimize = false;
     bool lite_mode = false;
+    bool scheduler_tune = true;
+    bool memory_tune = true;
+    bool io_tune = true;
+    bool gpu_tune = true;
+    bool input_boost = true;
+    bool thermal_guard = true;
 
     static const OmniConfig& get();
     static void reload();

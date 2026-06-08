@@ -7,8 +7,10 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <cctype>
+#include <cstring>
 #include <algorithm>
 #include <dirent.h>
+#include <initializer_list>
 
 namespace {
     constexpr const char* AUTO_TOP_APP_UCLAMP_MIN_ENTRY = "12";
@@ -37,6 +39,17 @@ namespace {
             if (!value.empty()) return value;
         }
         return {};
+    }
+
+    bool name_starts_with(const char* value, const char* prefix) {
+        return std::strncmp(value, prefix, std::strlen(prefix)) == 0;
+    }
+
+    bool is_tunable_block_device(const char* name) {
+        if (!name || name[0] == '.') return false;
+        return !name_starts_with(name, "loop")
+            && !name_starts_with(name, "ram")
+            && !name_starts_with(name, "zram");
     }
 
     int get_android_api_level() {
@@ -140,6 +153,237 @@ namespace {
         root.set_system_prop("debug.hwui.skia_tracing_enabled", "false");
         root.set_system_prop("debug.renderengine.vulkan.precompile.enabled", "true");
     }
+
+    void write_node_if_exists(const std::string& path, const char* value) {
+        if (!value || !path_exists(path.c_str())) return;
+        write_node(path.c_str(), value);
+    }
+
+    void write_uclamp_group(const char* group, const char* min_value, const char* max_value, const char* latency_sensitive) {
+        const std::string group_name(group);
+        const std::string cpuset_base = "/dev/cpuset/" + group_name;
+        const std::string cpuctl_base = "/dev/cpuctl/" + group_name;
+
+        write_node_if_exists(cpuset_base + "/uclamp.min", min_value);
+        write_node_if_exists(cpuset_base + "/uclamp.max", max_value);
+        write_node_if_exists(cpuset_base + "/uclamp.latency_sensitive", latency_sensitive);
+
+        write_node_if_exists(cpuctl_base + "/cpu.uclamp.min", min_value);
+        write_node_if_exists(cpuctl_base + "/cpu.uclamp.max", max_value);
+        write_node_if_exists(cpuctl_base + "/cpu.uclamp.latency_sensitive", latency_sensitive);
+    }
+
+    void write_schedtune_group(const char* group, const char* boost, const char* prefer_idle) {
+        const std::string base = std::string("/dev/stune/") + group;
+        write_node_if_exists(base + "/schedtune.boost", boost);
+        write_node_if_exists(base + "/schedtune.prefer_idle", prefer_idle);
+    }
+
+    void write_schedutil_rate_limits(const char* up_rate_limit, const char* down_rate_limit, const char* iowait_boost) {
+        if (DIR* cpufreq_dir = opendir("/sys/devices/system/cpu/cpufreq/"); cpufreq_dir) {
+            struct dirent* entry;
+            while ((entry = readdir(cpufreq_dir)) != nullptr) {
+                if (strncmp(entry->d_name, "policy", 6) != 0) continue;
+
+                const std::string base = std::string("/sys/devices/system/cpu/cpufreq/") + entry->d_name;
+                write_node_if_exists(base + "/schedutil/up_rate_limit_us", up_rate_limit);
+                write_node_if_exists(base + "/schedutil/down_rate_limit_us", down_rate_limit);
+                write_node_if_exists(base + "/schedutil/iowait_boost_enable", iowait_boost);
+            }
+            closedir(cpufreq_dir);
+        }
+    }
+
+    void tune_schedutil_rate_limits(const OmniConfig& config) {
+        const char* up_rate_limit = "1000";
+        const char* down_rate_limit = "20000";
+        const char* iowait_boost = "1";
+
+        if (config.power_policy == PowerPolicy::PERFORMANCE) {
+            up_rate_limit = "500";
+            down_rate_limit = "10000";
+        } else if (config.power_policy == PowerPolicy::POWERSAVE) {
+            up_rate_limit = "5000";
+            down_rate_limit = "50000";
+            iowait_boost = "0";
+        } else if (config.lite_mode) {
+            up_rate_limit = "3000";
+            down_rate_limit = "30000";
+        } else if (config.auto_optimize) {
+            up_rate_limit = "1000";
+            down_rate_limit = "18000";
+        }
+
+        write_schedutil_rate_limits(up_rate_limit, down_rate_limit, iowait_boost);
+    }
+
+    void apply_scheduler_optimizations(const OmniConfig& config, const CpuTopology& topology) {
+        if (!config.scheduler_tune) return;
+
+        const char* top_min = DEFAULT_TOP_APP_UCLAMP_MIN;
+        const char* top_max = DEFAULT_TOP_APP_UCLAMP_MAX;
+        const char* foreground_min = "0";
+        const char* group_max = DEFAULT_BACKGROUND_UCLAMP_MAX;
+        const char* top_boost = "8";
+        const char* foreground_boost = "0";
+        const char* background_boost = "0";
+        const char* top_prefer_idle = "1";
+
+        if (config.power_policy == PowerPolicy::PERFORMANCE) {
+            top_min = "30";
+            top_max = "max";
+            foreground_min = "8";
+            group_max = "45";
+            top_boost = "12";
+            foreground_boost = "2";
+        } else if (config.power_policy == PowerPolicy::POWERSAVE) {
+            top_min = "0";
+            top_max = "75";
+            foreground_min = "0";
+            group_max = "30";
+            top_boost = "0";
+            top_prefer_idle = "0";
+        } else if (config.auto_optimize) {
+            const auto profile = build_auto_optimize_profile(topology);
+            top_min = profile.top_app_uclamp_min;
+            top_max = "max";
+            group_max = profile.background_uclamp_max;
+            top_boost = "6";
+        } else if (config.lite_mode) {
+            top_min = "8";
+            top_max = LITE_TOP_APP_UCLAMP_MAX;
+            group_max = LITE_BACKGROUND_UCLAMP_MAX;
+            top_boost = "4";
+        }
+
+        write_uclamp_group("top-app", top_min, top_max, "1");
+        write_uclamp_group("foreground", foreground_min, "max", "0");
+        write_uclamp_group("background", "0", group_max, "0");
+        write_uclamp_group("system-background", "0", group_max, "0");
+
+        write_schedtune_group("top-app", top_boost, top_prefer_idle);
+        write_schedtune_group("foreground", foreground_boost, "0");
+        write_schedtune_group("background", background_boost, "0");
+        write_schedtune_group("system-background", background_boost, "0");
+
+        tune_schedutil_rate_limits(config);
+    }
+
+    void apply_io_optimizations(const OmniConfig& config) {
+        if (!config.io_tune) return;
+
+        const char* read_ahead_kb = "128";
+        const char* nr_requests = "64";
+        const char* rq_affinity = "2";
+
+        if (config.power_policy == PowerPolicy::PERFORMANCE) {
+            read_ahead_kb = "256";
+            nr_requests = "128";
+        } else if (config.power_policy == PowerPolicy::POWERSAVE) {
+            read_ahead_kb = "64";
+            nr_requests = "32";
+            rq_affinity = "1";
+        } else if (config.lite_mode) {
+            read_ahead_kb = "96";
+            nr_requests = "48";
+            rq_affinity = "1";
+        }
+
+        if (DIR* block_dir = opendir("/sys/block/"); block_dir) {
+            struct dirent* entry;
+            while ((entry = readdir(block_dir)) != nullptr) {
+                if (!is_tunable_block_device(entry->d_name)) continue;
+
+                const std::string base = std::string("/sys/block/") + entry->d_name + "/queue";
+                write_node_if_exists(base + "/read_ahead_kb", read_ahead_kb);
+                write_node_if_exists(base + "/nr_requests", nr_requests);
+                write_node_if_exists(base + "/rq_affinity", rq_affinity);
+                write_node_if_exists(base + "/iostats", "0");
+                write_node_if_exists(base + "/add_random", "0");
+            }
+            closedir(block_dir);
+        }
+    }
+
+    void apply_gpu_optimizations(const OmniConfig& config) {
+        if (!config.gpu_tune || config.lite_mode || config.power_policy == PowerPolicy::POWERSAVE) return;
+
+        const char* adreno_path = "/sys/class/kgsl/kgsl-3d0/devfreq/governor";
+        if (path_exists(adreno_path)) {
+            write_node(adreno_path, "msm-adreno-tz");
+        } else if (DIR* devfreq_dir = opendir("/sys/class/devfreq/"); devfreq_dir) {
+            struct dirent* entry;
+            while ((entry = readdir(devfreq_dir)) != nullptr) {
+                if (entry->d_name[0] == '.') continue;
+                const std::string gov_path = std::string("/sys/class/devfreq/") + entry->d_name + "/governor";
+                const std::string avail_path = std::string("/sys/class/devfreq/") + entry->d_name + "/available_governors";
+                const std::string avail_govs = read_node(avail_path.c_str());
+
+                if (avail_govs.find("mali_ondemand") != std::string::npos) {
+                    write_node(gov_path.c_str(), "mali_ondemand");
+                } else if (avail_govs.find("simple_ondemand") != std::string::npos) {
+                    write_node(gov_path.c_str(), "simple_ondemand");
+                }
+            }
+            closedir(devfreq_dir);
+        }
+    }
+
+    void apply_input_boost_optimizations(const OmniConfig& config) {
+        if (!config.input_boost) return;
+
+        const char* boost_ms = "80";
+        if (config.power_policy == PowerPolicy::PERFORMANCE) {
+            boost_ms = "120";
+        } else if (config.power_policy == PowerPolicy::POWERSAVE || config.lite_mode) {
+            boost_ms = "40";
+        }
+
+        write_node_if_exists("/sys/module/cpu_boost/parameters/input_boost_enabled", "1");
+        write_node_if_exists("/sys/module/cpu_boost/parameters/input_boost_ms", boost_ms);
+        write_node_if_exists("/sys/module/cpu_input_boost/parameters/input_boost_enabled", "1");
+        write_node_if_exists("/sys/module/cpu_input_boost/parameters/input_boost_ms", boost_ms);
+        write_node_if_exists("/sys/module/msm_performance/parameters/touchboost", "1");
+    }
+
+    int normalize_temperature_milli_degrees(int value) {
+        if (value <= 0) return 0;
+        return value < 1000 ? value * 1000 : value;
+    }
+
+    int read_max_thermal_milli_degrees() {
+        int max_temp = 0;
+        if (DIR* thermal_dir = opendir("/sys/class/thermal/"); thermal_dir) {
+            struct dirent* entry;
+            while ((entry = readdir(thermal_dir)) != nullptr) {
+                if (!name_starts_with(entry->d_name, "thermal_zone")) continue;
+
+                const std::string temp_path = std::string("/sys/class/thermal/") + entry->d_name + "/temp";
+                const int temp = normalize_temperature_milli_degrees(std::atoi(read_node(temp_path.c_str()).c_str()));
+                if (temp > 0 && temp < 125000) max_temp = std::max(max_temp, temp);
+            }
+            closedir(thermal_dir);
+        }
+        return max_temp;
+    }
+
+    void apply_thermal_guard(const OmniConfig& config) {
+        if (!config.thermal_guard) return;
+
+        const int max_temp = read_max_thermal_milli_degrees();
+        const int threshold = config.power_policy == PowerPolicy::PERFORMANCE
+            ? 52000
+            : ((config.power_policy == PowerPolicy::POWERSAVE || config.lite_mode) ? 44000 : 48000);
+        if (max_temp < threshold) return;
+
+        write_uclamp_group("top-app", "0", config.power_policy == PowerPolicy::POWERSAVE ? "60" : "70", "0");
+        write_uclamp_group("foreground", "0", "75", "0");
+        write_uclamp_group("background", "0", "25", "0");
+        write_uclamp_group("system-background", "0", "25", "0");
+        write_schedtune_group("top-app", "0", "0");
+        write_schedtune_group("foreground", "0", "0");
+        write_schedutil_rate_limits("5000", "50000", "0");
+    }
 } // namespace
 
 void init_daemon() {
@@ -147,19 +391,19 @@ void init_daemon() {
     if (daemon(0, 0) < 0) exit(EXIT_FAILURE);
 }
 
-void apply_memory_optimizations() {
+void apply_memory_optimizations(const OmniConfig& config) {
+    if (!config.memory_tune) return;
+
+    const bool gentle_profile = config.power_policy == PowerPolicy::POWERSAVE || config.lite_mode;
+
     // 啟用 Multi-Gen LRU (Android 14+ 預設啟用)
-    if (path_exists("/sys/kernel/mm/lru_gen/enabled")) {
-        write_node("/sys/kernel/mm/lru_gen/enabled", "7");
-    }
+    write_node_if_exists("/sys/kernel/mm/lru_gen/enabled", "7");
     // 最佳化 ZRAM 與 Page Swap 行為
-    if (path_exists("/proc/sys/vm/swappiness")) {
-        write_node("/proc/sys/vm/swappiness", "100");
-    }
+    write_node_if_exists("/proc/sys/vm/swappiness", gentle_profile ? "60" : "100");
     // 降低記憶體分配延遲
-    if (path_exists("/proc/sys/vm/watermark_scale_factor")) {
-        write_node("/proc/sys/vm/watermark_scale_factor", "20");
-    }
+    write_node_if_exists("/proc/sys/vm/watermark_scale_factor", gentle_profile ? "35" : "20");
+    write_node_if_exists("/proc/sys/vm/page-cluster", "0");
+    write_node_if_exists("/proc/sys/vm/compaction_proactiveness", gentle_profile ? "20" : "40");
 }
 
 void apply_core_optimizations() {
@@ -169,7 +413,7 @@ void apply_core_optimizations() {
     const auto& config = OmniConfig::get();
     const auto& root = RootEnvironment::get_adapter();
 
-    apply_memory_optimizations();
+    apply_memory_optimizations(config);
 
     write_node("/dev/cpuset/top-app/cpus", topology.all_cores.c_str());
     const std::string system_background_cpus = resolve_system_background_cpus(topology);
@@ -207,38 +451,6 @@ void apply_core_optimizations() {
         }
     }
 
-    if (path_exists("/dev/cpuset/top-app/uclamp.min")) {
-        if (config.power_policy == PowerPolicy::PERFORMANCE) {
-            write_node("/dev/cpuset/top-app/uclamp.min", "25");
-            write_node("/dev/cpuset/top-app/uclamp.max", "max");
-            write_node("/dev/cpuset/background/uclamp.max", "40");
-            write_node("/dev/cpuset/system-background/uclamp.max", "40");
-        } else if (config.power_policy == PowerPolicy::POWERSAVE) {
-            write_node("/dev/cpuset/top-app/uclamp.min", "0");
-            write_node("/dev/cpuset/top-app/uclamp.max", "75");
-            write_node("/dev/cpuset/background/uclamp.max", "30");
-            write_node("/dev/cpuset/system-background/uclamp.max", "30");
-        } else { // BALANCED
-            if (config.auto_optimize) {
-                const auto auto_profile = build_auto_optimize_profile(topology);
-                write_node("/dev/cpuset/top-app/uclamp.min", auto_profile.top_app_uclamp_min);
-                write_node("/dev/cpuset/top-app/uclamp.max", "max");
-                write_node("/dev/cpuset/background/uclamp.max", auto_profile.background_uclamp_max);
-                write_node("/dev/cpuset/system-background/uclamp.max", auto_profile.background_uclamp_max);
-            } else if (config.lite_mode) {
-                write_node("/dev/cpuset/top-app/uclamp.min", "10");
-                write_node("/dev/cpuset/top-app/uclamp.max", LITE_TOP_APP_UCLAMP_MAX);
-                write_node("/dev/cpuset/background/uclamp.max", LITE_BACKGROUND_UCLAMP_MAX);
-                write_node("/dev/cpuset/system-background/uclamp.max", LITE_BACKGROUND_UCLAMP_MAX);
-            } else {
-                write_node("/dev/cpuset/top-app/uclamp.min", DEFAULT_TOP_APP_UCLAMP_MIN);
-                write_node("/dev/cpuset/top-app/uclamp.max", DEFAULT_TOP_APP_UCLAMP_MAX);
-                write_node("/dev/cpuset/background/uclamp.max", DEFAULT_BACKGROUND_UCLAMP_MAX);
-                write_node("/dev/cpuset/system-background/uclamp.max", DEFAULT_BACKGROUND_UCLAMP_MAX);
-            }
-        }
-    }
-
     if (!topology.best_cpu_governor.empty() && !config.lite_mode) {
         if (DIR* cpu_dir = opendir("/sys/devices/system/cpu/"); cpu_dir) {
             struct dirent* entry;
@@ -262,27 +474,10 @@ void apply_core_optimizations() {
         }
     }
 
-    if (!config.lite_mode && config.power_policy != PowerPolicy::POWERSAVE) {
-        const char* adreno_path = "/sys/class/kgsl/kgsl-3d0/devfreq/governor";
-        if (path_exists(adreno_path)) {
-            write_node(adreno_path, "msm-adreno-tz");
-        } else if (DIR* devfreq_dir = opendir("/sys/class/devfreq/"); devfreq_dir) {
-            struct dirent* entry;
-            while ((entry = readdir(devfreq_dir)) != nullptr) {
-                if (entry->d_name[0] == '.') continue;
-                const std::string gov_path = std::string("/sys/class/devfreq/") + entry->d_name + "/governor";
-                const std::string avail_path = std::string("/sys/class/devfreq/") + entry->d_name + "/available_governors";
-                const std::string avail_govs = read_node(avail_path.c_str());
-
-                if (avail_govs.find("mali_ondemand") != std::string::npos) {
-                    write_node(gov_path.c_str(), "mali_ondemand");
-                } else if (avail_govs.find("simple_ondemand") != std::string::npos) {
-                    write_node(gov_path.c_str(), "simple_ondemand");
-                }
-            }
-            closedir(devfreq_dir);
-        }
-    }
-
+    apply_scheduler_optimizations(config, topology);
+    apply_io_optimizations(config);
+    apply_gpu_optimizations(config);
+    apply_input_boost_optimizations(config);
+    apply_thermal_guard(config);
     apply_render_engine_optimizations(config, root);
 }

@@ -86,5 +86,11 @@ void OmniConfig::reload() {
         auto perfNode = data["performance"];
         current_config.auto_optimize = perfNode.value("auto_optimize", false);
         current_config.lite_mode = perfNode.value("lite_mode", false);
+        current_config.scheduler_tune = perfNode.value("scheduler_tune", true);
+        current_config.memory_tune = perfNode.value("memory_tune", true);
+        current_config.io_tune = perfNode.value("io_tune", true);
+        current_config.gpu_tune = perfNode.value("gpu_tune", true);
+        current_config.input_boost = perfNode.value("input_boost", true);
+        current_config.thermal_guard = perfNode.value("thermal_guard", true);
     }
 }

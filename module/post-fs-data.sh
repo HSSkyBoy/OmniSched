@@ -19,12 +19,20 @@ if [ ! -f "$CONFIG_FILE" ] && [ -f "$LEGACY_CONFIG_FILE" ]; then
     cp "$LEGACY_CONFIG_FILE" "$CONFIG_FILE" 2>/dev/null
 fi
 
-echo 0 > /proc/sys/vm/page-cluster 2>/dev/null
+MEMORY_TUNE="true"
+if [ -f "$CONFIG_FILE" ]; then
+    MEMORY_TUNE_VALUE=$(grep -o '"memory_tune"[[:space:]]*:[[:space:]]*\(true\|false\)' "$CONFIG_FILE" 2>/dev/null \
+        | tail -n1 \
+        | sed 's/.*:[[:space:]]*//')
+    [ "$MEMORY_TUNE_VALUE" = "false" ] && MEMORY_TUNE="false"
+fi
+
+[ "$MEMORY_TUNE" = "true" ] && echo 0 > /proc/sys/vm/page-cluster 2>/dev/null
 A_API=$(getprop ro.build.version.sdk)
 [ -z "$A_API" ] && exit 0
 [ "$A_API" -lt 31 ] && exit 0
 
-if [ "$A_API" -ge 34 ]; then
+if [ "$MEMORY_TUNE" = "true" ] && [ "$A_API" -ge 34 ]; then
     resetprop -n ro.lmk.use_minfree_levels true
     resetprop -n ro.lmk.enhance_batch_kill false
     resetprop -n ro.lmk.swap_util_max 90
