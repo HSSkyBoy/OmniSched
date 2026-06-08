@@ -34,6 +34,15 @@ namespace {
         const char* background_uclamp_max;
     };
 
+    struct SchedulerRuntimeProfile {
+        std::string foreground_cpus;
+        std::string system_background_cpus;
+        std::string background_cpus;
+        std::string governor;
+        int scaling_min_freq_khz = -1;
+        int scaling_max_freq_khz = -1;
+    };
+
     std::string first_non_empty(std::initializer_list<std::string> values) {
         for (const auto& value : values) {
             if (!value.empty()) return value;
@@ -63,6 +72,15 @@ namespace {
 
     bool has_dedicated_mid_cluster(const CpuTopology& topology) {
         return !topology.cluster_mid.empty() && topology.cluster_mid != topology.cluster_big;
+    }
+
+    std::string choose_configured_cpuset(const std::string& configured, const std::string& fallback) {
+        return configured.empty() ? fallback : normalize_cpuset(configured);
+    }
+
+    std::string choose_int_override(int override_value, const char* fallback) {
+        if (override_value < 0) return fallback;
+        return std::to_string(override_value);
     }
 
     std::string resolve_system_background_cpus(const CpuTopology& topology) {
@@ -194,6 +212,26 @@ namespace {
         }
     }
 
+    void write_cpu_freq_limits(int min_freq_khz, int max_freq_khz) {
+        if (min_freq_khz < 0 && max_freq_khz < 0) return;
+
+        if (DIR* cpufreq_dir = opendir("/sys/devices/system/cpu/cpufreq/"); cpufreq_dir) {
+            struct dirent* entry;
+            while ((entry = readdir(cpufreq_dir)) != nullptr) {
+                if (std::strncmp(entry->d_name, "policy", 6) != 0) continue;
+
+                const std::string base = std::string("/sys/devices/system/cpu/cpufreq/") + entry->d_name;
+                if (min_freq_khz >= 0) {
+                    write_node_if_exists(base + "/scaling_min_freq", std::to_string(min_freq_khz).c_str());
+                }
+                if (max_freq_khz >= 0) {
+                    write_node_if_exists(base + "/scaling_max_freq", std::to_string(max_freq_khz).c_str());
+                }
+            }
+            closedir(cpufreq_dir);
+        }
+    }
+
     void tune_schedutil_rate_limits(const OmniConfig& config) {
         const char* up_rate_limit = "1000";
         const char* down_rate_limit = "20000";
@@ -214,7 +252,18 @@ namespace {
             down_rate_limit = "18000";
         }
 
-        write_schedutil_rate_limits(up_rate_limit, down_rate_limit, iowait_boost);
+        const std::string up_rate_limit_value =
+            choose_int_override(config.scheduler.schedutil_up_rate_limit_us, up_rate_limit);
+        const std::string down_rate_limit_value =
+            choose_int_override(config.scheduler.schedutil_down_rate_limit_us, down_rate_limit);
+        const std::string iowait_boost_value =
+            choose_int_override(config.scheduler.schedutil_iowait_boost, iowait_boost);
+
+        write_schedutil_rate_limits(
+            up_rate_limit_value.c_str(),
+            down_rate_limit_value.c_str(),
+            iowait_boost_value.c_str()
+        );
     }
 
     void apply_scheduler_optimizations(const OmniConfig& config, const CpuTopology& topology) {
@@ -256,10 +305,16 @@ namespace {
             top_boost = "4";
         }
 
-        write_uclamp_group("top-app", top_min, top_max, "1");
-        write_uclamp_group("foreground", foreground_min, "max", "0");
-        write_uclamp_group("background", "0", group_max, "0");
-        write_uclamp_group("system-background", "0", group_max, "0");
+        const std::string top_min_value = choose_int_override(config.scheduler.top_app_uclamp_min, top_min);
+        const std::string foreground_min_value =
+            choose_int_override(config.scheduler.foreground_uclamp_min, foreground_min);
+        const std::string group_max_value =
+            choose_int_override(config.scheduler.background_uclamp_max, group_max);
+
+        write_uclamp_group("top-app", top_min_value.c_str(), top_max, "1");
+        write_uclamp_group("foreground", foreground_min_value.c_str(), "max", "0");
+        write_uclamp_group("background", "0", group_max_value.c_str(), "0");
+        write_uclamp_group("system-background", "0", group_max_value.c_str(), "0");
 
         write_schedtune_group("top-app", top_boost, top_prefer_idle);
         write_schedtune_group("foreground", foreground_boost, "0");
@@ -339,10 +394,12 @@ namespace {
             boost_ms = "40";
         }
 
+        const std::string boost_ms_value = choose_int_override(config.input.boost_ms, boost_ms);
+
         write_node_if_exists("/sys/module/cpu_boost/parameters/input_boost_enabled", "1");
-        write_node_if_exists("/sys/module/cpu_boost/parameters/input_boost_ms", boost_ms);
+        write_node_if_exists("/sys/module/cpu_boost/parameters/input_boost_ms", boost_ms_value.c_str());
         write_node_if_exists("/sys/module/cpu_input_boost/parameters/input_boost_enabled", "1");
-        write_node_if_exists("/sys/module/cpu_input_boost/parameters/input_boost_ms", boost_ms);
+        write_node_if_exists("/sys/module/cpu_input_boost/parameters/input_boost_ms", boost_ms_value.c_str());
         write_node_if_exists("/sys/module/msm_performance/parameters/touchboost", "1");
     }
 
@@ -371,18 +428,74 @@ namespace {
         if (!config.thermal_guard) return;
 
         const int max_temp = read_max_thermal_milli_degrees();
-        const int threshold = config.power_policy == PowerPolicy::PERFORMANCE
+        int threshold = config.power_policy == PowerPolicy::PERFORMANCE
             ? 52000
             : ((config.power_policy == PowerPolicy::POWERSAVE || config.lite_mode) ? 44000 : 48000);
+        if (config.thermal.throttle_temp_c >= 0) {
+            threshold = config.thermal.throttle_temp_c * 1000;
+        }
         if (max_temp < threshold) return;
 
-        write_uclamp_group("top-app", "0", config.power_policy == PowerPolicy::POWERSAVE ? "60" : "70", "0");
-        write_uclamp_group("foreground", "0", "75", "0");
-        write_uclamp_group("background", "0", "25", "0");
-        write_uclamp_group("system-background", "0", "25", "0");
+        const char* top_max = config.power_policy == PowerPolicy::POWERSAVE ? "60" : "70";
+        const char* foreground_max = "75";
+        const char* background_max = "25";
+        const std::string top_max_value = choose_int_override(config.thermal.top_app_uclamp_max, top_max);
+        const std::string foreground_max_value =
+            choose_int_override(config.thermal.foreground_uclamp_max, foreground_max);
+        const std::string background_max_value =
+            choose_int_override(config.thermal.background_uclamp_max, background_max);
+
+        write_uclamp_group("top-app", "0", top_max_value.c_str(), "0");
+        write_uclamp_group("foreground", "0", foreground_max_value.c_str(), "0");
+        write_uclamp_group("background", "0", background_max_value.c_str(), "0");
+        write_uclamp_group("system-background", "0", background_max_value.c_str(), "0");
         write_schedtune_group("top-app", "0", "0");
         write_schedtune_group("foreground", "0", "0");
         write_schedutil_rate_limits("5000", "50000", "0");
+    }
+
+    SchedulerRuntimeProfile build_scheduler_runtime_profile(const OmniConfig& config, const CpuTopology& topology) {
+        SchedulerRuntimeProfile profile;
+
+        const std::string system_background_cpus = resolve_system_background_cpus(topology);
+        const std::string strict_background_cpus = resolve_background_cpus(topology, true);
+        const std::string relaxed_background_cpus = resolve_background_cpus(topology, false);
+
+        profile.foreground_cpus = topology.all_cores;
+        profile.system_background_cpus = system_background_cpus;
+        profile.background_cpus = config.background_little_core_only ? strict_background_cpus : relaxed_background_cpus;
+
+        if (config.power_policy == PowerPolicy::PERFORMANCE) {
+            profile.foreground_cpus = topology.all_cores;
+            profile.system_background_cpus = topology.all_cores;
+            profile.background_cpus = relaxed_background_cpus;
+        } else if (config.power_policy == PowerPolicy::POWERSAVE) {
+            profile.foreground_cpus = first_non_empty({
+                combine_cpus(topology.cluster_little, topology.cluster_mid),
+                topology.cluster_little,
+                system_background_cpus,
+                topology.all_cores
+            });
+            profile.system_background_cpus = strict_background_cpus;
+            profile.background_cpus = strict_background_cpus;
+        } else if (config.auto_optimize) {
+            const auto auto_profile = build_auto_optimize_profile(topology);
+            profile.foreground_cpus = auto_profile.foreground_cpus;
+            profile.system_background_cpus = auto_profile.system_background_cpus;
+            profile.background_cpus = auto_profile.background_cpus;
+        }
+
+        profile.foreground_cpus = choose_configured_cpuset(config.cpu.foreground_cpuset, profile.foreground_cpus);
+        profile.system_background_cpus = choose_configured_cpuset(
+            config.cpu.system_background_cpuset,
+            profile.system_background_cpus
+        );
+        profile.background_cpus = choose_configured_cpuset(config.cpu.background_cpuset, profile.background_cpus);
+
+        profile.scaling_min_freq_khz = config.cpu.scaling_min_freq_khz;
+        profile.scaling_max_freq_khz = config.cpu.scaling_max_freq_khz;
+        profile.governor = config.cpu.governor_override;
+        return profile;
     }
 } // namespace
 
@@ -416,42 +529,12 @@ void apply_core_optimizations() {
     apply_memory_optimizations(config);
 
     write_node("/dev/cpuset/top-app/cpus", topology.all_cores.c_str());
-    const std::string system_background_cpus = resolve_system_background_cpus(topology);
-    const std::string strict_background_cpus = resolve_background_cpus(topology, true);
-    const std::string relaxed_background_cpus = resolve_background_cpus(topology, false);
+    const auto runtime = build_scheduler_runtime_profile(config, topology);
+    write_node("/dev/cpuset/foreground/cpus", runtime.foreground_cpus.c_str());
+    write_node("/dev/cpuset/system-background/cpus", runtime.system_background_cpus.c_str());
+    write_node("/dev/cpuset/background/cpus", runtime.background_cpus.c_str());
 
-    if (config.power_policy == PowerPolicy::PERFORMANCE) {
-        write_node("/dev/cpuset/foreground/cpus", topology.all_cores.c_str());
-        write_node("/dev/cpuset/system-background/cpus", topology.all_cores.c_str());
-        write_node("/dev/cpuset/background/cpus", relaxed_background_cpus.c_str());
-    } else if (config.power_policy == PowerPolicy::POWERSAVE) {
-        std::string fg_save_cpus = first_non_empty({
-            combine_cpus(topology.cluster_little, topology.cluster_mid),
-            topology.cluster_little,
-            system_background_cpus,
-            topology.all_cores
-        });
-
-        write_node("/dev/cpuset/foreground/cpus", fg_save_cpus.c_str());
-        write_node("/dev/cpuset/system-background/cpus", strict_background_cpus.c_str());
-        write_node("/dev/cpuset/background/cpus", strict_background_cpus.c_str());
-    } else { // BALANCED
-        if (config.auto_optimize) {
-            const auto auto_profile = build_auto_optimize_profile(topology);
-            write_node("/dev/cpuset/foreground/cpus", auto_profile.foreground_cpus.c_str());
-            write_node("/dev/cpuset/system-background/cpus", auto_profile.system_background_cpus.c_str());
-            write_node("/dev/cpuset/background/cpus", auto_profile.background_cpus.c_str());
-        } else {
-            write_node("/dev/cpuset/foreground/cpus", topology.all_cores.c_str());
-            write_node("/dev/cpuset/system-background/cpus", system_background_cpus.c_str());
-            write_node(
-                "/dev/cpuset/background/cpus",
-                (config.background_little_core_only ? strict_background_cpus : relaxed_background_cpus).c_str()
-            );
-        }
-    }
-
-    if (!topology.best_cpu_governor.empty() && !config.lite_mode) {
+    if (topology.has_cpufreq && !config.lite_mode) {
         if (DIR* cpu_dir = opendir("/sys/devices/system/cpu/"); cpu_dir) {
             struct dirent* entry;
             while ((entry = readdir(cpu_dir)) != nullptr) {
@@ -459,19 +542,33 @@ void apply_core_optimizations() {
                     const std::string avail_path = std::string("/sys/devices/system/cpu/") + entry->d_name + "/cpufreq/scaling_available_governors";
                     const std::string gov_path = std::string("/sys/devices/system/cpu/") + entry->d_name + "/cpufreq/scaling_governor";
 
-                    std::string target_gov = topology.best_cpu_governor;
+                    std::string target_gov = runtime.governor.empty() ? topology.best_cpu_governor : runtime.governor;
                     const std::string avail_govs = read_node(avail_path.c_str());
 
                     if (config.power_policy == PowerPolicy::PERFORMANCE && avail_govs.find("performance") != std::string::npos) {
                         target_gov = "performance";
                     } else if (config.power_policy == PowerPolicy::POWERSAVE && avail_govs.find("schedutil") != std::string::npos) {
                         target_gov = "schedutil";
+                    } else if (!runtime.governor.empty() && avail_govs.find(runtime.governor) == std::string::npos) {
+                        target_gov = topology.best_cpu_governor;
                     }
                     write_node(gov_path.c_str(), target_gov.c_str());
                 }
             }
             closedir(cpu_dir);
         }
+
+        int min_freq_khz = runtime.scaling_min_freq_khz;
+        int max_freq_khz = runtime.scaling_max_freq_khz;
+        if (config.power_policy == PowerPolicy::POWERSAVE && topology.max_freq_khz > 0 && max_freq_khz < 0) {
+            max_freq_khz = (topology.max_freq_khz * 75) / 100;
+        } else if (config.power_policy == PowerPolicy::PERFORMANCE && topology.max_freq_khz > 0 && min_freq_khz < 0) {
+            min_freq_khz = (topology.max_freq_khz * 55) / 100;
+        }
+        if (max_freq_khz >= 0 && min_freq_khz > max_freq_khz) {
+            min_freq_khz = max_freq_khz;
+        }
+        write_cpu_freq_limits(min_freq_khz, max_freq_khz);
     }
 
     apply_scheduler_optimizations(config, topology);
