@@ -41,13 +41,13 @@ struct OmniConfig {
     std::vector<std::string> vulkan_apps;
 
     PowerPolicy power_policy = PowerPolicy::BALANCED;
-    bool background_little_core_only = true;
+    bool background_little_core_only = false;
     bool auto_optimize = false;
     bool lite_mode = false;
-    bool scheduler_tune = true;
-    bool memory_tune = true;
-    bool io_tune = true;
-    bool gpu_tune = true;
+    bool scheduler_tune = false;
+    bool memory_tune = false;
+    bool io_tune = false;
+    bool gpu_tune = false;
     bool input_boost = true;
     bool thermal_guard = true;
     SchedulerConfig scheduler;

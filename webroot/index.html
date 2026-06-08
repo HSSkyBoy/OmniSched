@@ -1,267 +1,334 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hans">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Zygisk OmniSched</title>
     <style>
         :root {
-            --bg: #0b0c0d;
-            --surface: #151715;
-            --surface-2: #1f221f;
-            --surface-3: #282c28;
-            --line: #353b34;
-            --line-strong: #50574d;
-            --txt: #f6f3eb;
-            --dim: #858b80;
-            --ok: #48d47e;
-            --ok-ink: #06100a;
-            --warn: #f2b95f;
-            --danger: #ff7a66;
-            --accent: #4abcae;
+            --bg: #0e1114;
+            --surface: #171b20;
+            --surface-2: #20262d;
+            --surface-3: #2a3139;
+            --line: #343c45;
+            --line-strong: #52606c;
+            --text: #f3f5f6;
+            --muted: #a9b2bc;
+            --subtle: #77828e;
+            --primary: #4fc3b1;
+            --primary-ink: #03120f;
+            --warn: #f1c56c;
+            --danger: #ff7c70;
+            --focus: #7dd3fc;
         }
+
         * {
             box-sizing: border-box;
         }
+
         html {
             color-scheme: dark;
         }
+
         body {
             margin: 0;
             min-height: 100dvh;
-            padding: max(10px, env(safe-area-inset-top)) 10px max(18px, env(safe-area-inset-bottom));
-            color: var(--txt);
+            padding: max(14px, env(safe-area-inset-top)) 12px max(20px, env(safe-area-inset-bottom));
+            color: var(--text);
             background: var(--bg);
             font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
+
         button,
         select,
         input,
         textarea {
             font: inherit;
         }
-        .app-shell {
-            width: min(100%, 560px);
+
+        .app {
+            width: min(100%, 720px);
             margin: 0 auto;
             display: grid;
-            gap: 8px;
+            gap: 12px;
         }
-        .app-header {
+
+        .topbar {
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: space-between;
-            gap: 10px;
-            padding: 0 2px 2px;
+            gap: 12px;
+            padding: 2px 2px 4px;
         }
-        h1 {
+
+        h1,
+        h2 {
             margin: 0;
-            font-size: 21px;
-            line-height: 1.12;
-            font-weight: 750;
             letter-spacing: 0;
         }
-        .lang-wrap {
-            display: grid;
-            gap: 4px;
-            min-width: 104px;
+
+        h1 {
+            font-size: 24px;
+            line-height: 1.15;
+            font-weight: 780;
         }
-        .label,
-        .meta-label {
-            color: var(--dim);
+
+        .tagline {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .pill {
+            min-height: 32px;
+            padding: 5px 10px;
+            border: 1px solid rgba(79, 195, 177, .35);
+            border-radius: 999px;
+            color: var(--primary);
+            background: rgba(79, 195, 177, .08);
             font-size: 12px;
-            font-weight: 650;
+            font-weight: 720;
+            white-space: nowrap;
         }
-        .status-panel,
-        .section {
+
+        .panel {
             border: 1px solid var(--line);
             border-radius: 8px;
             background: var(--surface);
             overflow: hidden;
         }
-        .status-panel {
-            display: grid;
-            gap: 8px;
-            padding: 7px 8px;
-            background: var(--surface-2);
-        }
-        .status-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: center;
-            gap: 8px;
-        }
-        #config_path,
-        #config_source {
-            margin-top: 2px;
-            color: var(--txt);
-            font-size: 12px;
-            overflow-wrap: anywhere;
-        }
-        #config_source {
-            color: var(--dim);
-        }
-        .actions {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-        .r {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: center;
-            gap: 8px;
-            padding: 8px;
-            border-top: 1px solid var(--line);
-        }
-        .section > .r:first-child {
-            border-top: 0;
-        }
-        .r.range-row {
-            grid-template-columns: 1fr;
-        }
-        .k {
-            min-width: 0;
-        }
-        .k b {
-            display: block;
-            font-size: 14px;
-            line-height: 1.35;
-            font-weight: 720;
-        }
-        .n {
+
+        .panel-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            margin-bottom: 7px;
+            padding: 11px 12px;
+            border-bottom: 1px solid var(--line);
+            background: var(--surface-2);
         }
-        .v {
-            min-width: 48px;
-            padding: 2px 6px;
-            border: 1px solid rgba(72, 212, 126, .35);
-            border-radius: 8px;
-            color: var(--ok);
-            background: rgba(72, 212, 126, .09);
-            text-align: center;
-            font-size: 13px;
+
+        .panel-title {
+            font-size: 15px;
+            line-height: 1.25;
             font-weight: 760;
-            font-variant-numeric: tabular-nums;
         }
-        .d {
-            opacity: .5;
+
+        .panel-note {
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
         }
-        .sel-ui,
-        .input-ui,
-        .btn-ui {
-            border-radius: 8px;
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+        }
+
+        .meta-label {
+            color: var(--subtle);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        #config_path,
+        #config_source {
+            margin-top: 3px;
+            overflow-wrap: anywhere;
+            font-size: 12px;
+        }
+
+        #config_source {
+            color: var(--muted);
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 12px;
+            min-height: 58px;
+            padding: 11px 12px;
+            border-top: 1px solid var(--line);
+        }
+
+        .row:first-child,
+        .panel-head + .row {
+            border-top: 0;
+        }
+
+        .row.stack {
+            grid-template-columns: 1fr;
+        }
+
+        .control-copy {
+            min-width: 0;
+        }
+
+        .control-title {
+            display: block;
+            font-size: 14px;
+            line-height: 1.25;
+            font-weight: 720;
+        }
+
+        .control-desc {
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .select,
+        .input,
+        .button {
+            min-height: 40px;
             border: 1px solid var(--line-strong);
+            border-radius: 8px;
             outline: 0;
         }
-        .sel-ui {
-            min-width: 104px;
-            min-height: 38px;
-            padding: 6px 9px;
-            color: var(--txt);
-            background: var(--surface-3);
+
+        .select,
+        .input {
+            width: 100%;
+            color: var(--text);
+            background: #11161b;
+        }
+
+        .select {
+            min-width: 150px;
+            padding: 6px 10px;
             cursor: pointer;
             font-size: 13px;
             font-weight: 650;
         }
-        .input-ui {
-            width: 100%;
-            min-width: 0;
-            min-height: 38px;
-            padding: 6px 9px;
-            color: var(--txt);
-            background: #101110;
+
+        .input {
+            padding: 7px 10px;
+            font-size: 13px;
         }
-        textarea.input-ui {
-            min-height: 76px;
-            padding: 7px 9px;
+
+        textarea.input {
+            min-height: 92px;
             resize: vertical;
             line-height: 1.55;
             font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-            font-size: 12px;
         }
-        .input-label {
-            display: block;
-            margin-bottom: 5px;
-            color: var(--dim);
-            font-size: 12px;
-            font-weight: 650;
-        }
-        .btn-ui {
-            min-height: 38px;
-            padding: 6px 10px;
-            color: var(--ok-ink);
-            background: var(--ok);
+
+        .button {
+            padding: 7px 12px;
+            color: var(--primary-ink);
+            background: var(--primary);
             cursor: pointer;
             font-size: 13px;
-            font-weight: 760;
-            transition: transform .18s ease, background-color .18s ease, border-color .18s ease;
+            font-weight: 780;
+            transition: transform .16s ease, border-color .16s ease, background-color .16s ease;
         }
-        .btn-ui.secondary {
-            color: var(--txt);
+
+        .button.secondary {
+            color: var(--text);
             background: transparent;
-            border-color: var(--line-strong);
         }
-        .btn-ui.warning {
-            color: #181007;
+
+        .button.warning {
+            color: #1a1205;
+            border-color: rgba(241, 197, 108, .85);
             background: var(--warn);
-            border-color: rgba(242, 185, 95, .8);
         }
-        .btn-ui:active {
+
+        .button:active {
             transform: scale(.98);
         }
-        .btn-ui:focus-visible,
-        .sel-ui:focus-visible,
-        .input-ui:focus-visible,
-        .w input:focus-visible + i {
-            outline: 2px solid var(--accent);
+
+        .button:disabled {
+            cursor: wait;
+            opacity: .72;
+        }
+
+        .button:focus-visible,
+        .select:focus-visible,
+        .input:focus-visible,
+        .switch input:focus-visible + i {
+            outline: 2px solid var(--focus);
             outline-offset: 2px;
         }
-        .w {
+
+        .switch {
             position: relative;
-            width: 48px;
-            height: 28px;
+            width: 52px;
+            height: 30px;
             flex: none;
         }
-        .w input {
+
+        .switch input {
             position: absolute;
             width: 1px;
             height: 1px;
             opacity: 0;
         }
-        .w i {
+
+        .switch i {
             position: absolute;
             inset: 0;
             border: 1px solid var(--line-strong);
             border-radius: 999px;
-            background: #252824;
+            background: #2a3139;
             cursor: pointer;
-            transition: background-color .2s ease, border-color .2s ease;
+            transition: background-color .18s ease, border-color .18s ease;
         }
-        .w i:before {
+
+        .switch i:before {
             content: "";
             position: absolute;
             left: 4px;
             top: 4px;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
-            background: #f6f3eb;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, .38);
-            transition: transform .2s ease;
+            background: #f3f5f6;
+            transition: transform .18s ease;
         }
-        input:checked + i {
-            border-color: rgba(72, 212, 126, .7);
-            background: rgba(72, 212, 126, .9);
+
+        .switch input:checked + i {
+            border-color: rgba(79, 195, 177, .8);
+            background: rgba(79, 195, 177, .9);
         }
-        input:checked + i:before {
-            transform: translateX(20px);
+
+        .switch input:checked + i:before {
+            transform: translateX(22px);
         }
+
+        .range-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 9px;
+        }
+
+        .value {
+            min-width: 58px;
+            padding: 2px 7px;
+            border: 1px solid rgba(79, 195, 177, .35);
+            border-radius: 8px;
+            color: var(--primary);
+            background: rgba(79, 195, 177, .08);
+            text-align: center;
+            font-size: 13px;
+            font-weight: 760;
+            font-variant-numeric: tabular-nums;
+        }
+
         input[type=range] {
             width: 100%;
             height: 7px;
@@ -269,86 +336,123 @@
             outline: 0;
             appearance: none;
             -webkit-appearance: none;
-            background: linear-gradient(to right, var(--ok) var(--p, 0%), #3a3d38 var(--p, 0%));
+            background: linear-gradient(to right, var(--primary) var(--p, 0%), #3d4650 var(--p, 0%));
         }
+
         input[type=range]::-webkit-slider-thumb {
             width: 20px;
             height: 20px;
             border: 3px solid var(--surface);
             border-radius: 50%;
-            background: var(--ok);
-            box-shadow: 0 0 0 1px rgba(72, 212, 126, .55);
+            background: var(--primary);
             -webkit-appearance: none;
         }
+
         input[type=range]::-moz-range-thumb {
             width: 16px;
             height: 16px;
             border: 3px solid var(--surface);
             border-radius: 50%;
-            background: var(--ok);
-            box-shadow: 0 0 0 1px rgba(72, 212, 126, .55);
+            background: var(--primary);
         }
-        input[disabled],
-        input[disabled] + i,
-        select[disabled] {
-            cursor: not-allowed;
-            filter: grayscale(.65);
-        }
-        .stack {
-            grid-column: 1 / -1;
-            width: 100%;
-        }
-        .stack[hidden] {
+
+        .advanced-panel[hidden],
+        .per-app[hidden] {
             display: none;
         }
-        .x {
+
+        .advanced-panel {
+            border-top: 1px solid var(--line);
+            background: rgba(255, 255, 255, .015);
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .field {
+            display: grid;
+            gap: 5px;
+        }
+
+        .field label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .toast {
             position: fixed;
             left: 50%;
             bottom: max(22px, env(safe-area-inset-bottom));
-            z-index: 20;
+            z-index: 30;
             max-width: calc(100vw - 28px);
-            padding: 9px 13px;
-            border: 1px solid rgba(246, 243, 235, .12);
+            padding: 10px 14px;
+            border: 1px solid rgba(243, 245, 246, .14);
             border-radius: 999px;
-            color: var(--txt);
-            background: rgba(19, 20, 18, .94);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, .32);
+            color: var(--text);
+            background: rgba(15, 18, 22, .96);
             opacity: 0;
             visibility: hidden;
-            transform: translate(-50%, 12px);
-            transition: opacity .2s ease, transform .2s ease, visibility .2s ease;
+            transform: translate(-50%, 10px);
+            transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
             font-size: 13px;
         }
-        .x.s {
+
+        .toast.show {
             opacity: 1;
             visibility: visible;
             transform: translate(-50%, 0);
         }
-        .x.error {
-            border-color: rgba(255, 122, 102, .35);
-            color: #ffe2dc;
+
+        .toast.error {
+            border-color: rgba(255, 124, 112, .42);
+            color: #ffe2de;
         }
-        @media (max-width: 560px) {
-            .status-grid {
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .disabled {
+            opacity: .55;
+        }
+
+        @media (max-width: 620px) {
+            body {
+                padding-inline: 10px;
+            }
+
+            .topbar,
+            .status-grid,
+            .row {
                 grid-template-columns: 1fr;
             }
-            .lang-wrap,
-            .sel-ui,
+
+            .topbar {
+                align-items: flex-start;
+            }
+
             .actions,
-            .btn-ui {
+            .button,
+            .select,
+            .field-grid {
                 width: 100%;
             }
-            .actions {
+
+            .actions,
+            .field-grid {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: 1fr;
             }
-            .sel-ui {
-                min-width: 0;
-            }
-            .w {
+
+            .switch {
                 justify-self: end;
             }
         }
+
         @media (prefers-reduced-motion: reduce) {
             *,
             *::before,
@@ -360,292 +464,312 @@
     </style>
 </head>
 <body>
-<main class="app-shell">
-    <header class="app-header">
-        <h1 id="title">OmniSched</h1>
-        <label class="lang-wrap" for="language">
-            <span class="label" id="lang_label"></span>
-            <select id="language" class="sel-ui" aria-labelledby="lang_label">
-                <option value="zh-Hant">繁中</option>
-                <option value="zh-Hans">简中</option>
-                <option value="en">English</option>
-            </select>
-        </label>
+<main class="app">
+    <header class="topbar">
+        <div>
+            <h1>OmniSched</h1>
+            <p class="tagline">调度、渲染与性能配置</p>
+        </div>
+        <div class="pill" id="bridge_status">等待连接</div>
     </header>
 
-    <section class="status-panel" aria-labelledby="config_path_label">
+    <section class="panel" aria-labelledby="status_title">
         <div class="status-grid">
             <div>
-                <div class="meta-label" id="config_path_label"></div>
+                <div class="meta-label" id="status_title">配置文件</div>
                 <div id="config_path"></div>
                 <div id="config_source"></div>
             </div>
             <div class="actions">
-                <button id="reload_now" class="btn-ui secondary" type="button"></button>
-                <button id="save_now" class="btn-ui" type="button"></button>
-                <button id="reset_defaults" class="btn-ui warning" type="button"></button>
+                <button id="reload_now" class="button secondary" type="button">重新读取</button>
+                <button id="save_now" class="button" type="button">保存</button>
+                <button id="reset_defaults" class="button warning" type="button">恢复默认</button>
             </div>
         </div>
     </section>
 
-    <section class="section">
-        <div class="r" id="row_power">
-            <div class="k"><b id="power_title"></b></div>
-            <select id="power" class="sel-ui" aria-labelledby="power_title"></select>
-        </div>
-        <div class="r">
-            <div class="k"><b id="auto_title"></b></div>
-            <label class="w" for="auto_optimize"><input id="auto_optimize" type="checkbox" aria-labelledby="auto_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="k"><b id="scheduler_title"></b></div>
-            <label class="w" for="scheduler_tune"><input id="scheduler_tune" type="checkbox" aria-labelledby="scheduler_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="k"><b id="memory_title"></b></div>
-            <label class="w" for="memory_tune"><input id="memory_tune" type="checkbox" aria-labelledby="memory_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="k"><b id="io_title"></b></div>
-            <label class="w" for="io_tune"><input id="io_tune" type="checkbox" aria-labelledby="io_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="k"><b id="gpu_title"></b></div>
-            <label class="w" for="gpu_tune"><input id="gpu_tune" type="checkbox" aria-labelledby="gpu_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="k"><b id="input_title"></b></div>
-            <label class="w" for="input_boost"><input id="input_boost" type="checkbox" aria-labelledby="input_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="k"><b id="thermal_title"></b></div>
-            <label class="w" for="thermal_guard"><input id="thermal_guard" type="checkbox" aria-labelledby="thermal_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="k"><b id="vk_title"></b></div>
-            <select id="vk_mode" class="sel-ui" aria-labelledby="vk_title"></select>
-            <div id="vk_app_mgr" class="stack" hidden>
-                <label class="input-label" for="app_pkg" id="app_pkg_label"></label>
-                <textarea id="app_pkg" class="input-ui" spellcheck="false"></textarea>
+    <section class="panel" aria-labelledby="basic_title">
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title" id="basic_title">基础设置</h2>
+                <div class="panel-note">基础项偏向日常稳定，触控 boost 与温控保护默认开启。</div>
             </div>
         </div>
-        <div class="r range-row" id="row_poll">
-            <div class="k">
-                <div class="n">
-                    <b id="poll_title"></b>
-                    <span class="v" id="poll_value">950</span>
+
+        <div class="row">
+            <div class="control-copy">
+                <span class="control-title">电源策略</span>
+                <div class="control-desc">影响自动选择的调度倾向。均衡适合日常，性能会更激进，省电会更保守。</div>
+            </div>
+            <select id="power" class="select">
+                <option value="balanced">均衡</option>
+                <option value="performance">性能</option>
+                <option value="powersave">省电</option>
+            </select>
+        </div>
+
+        <div class="row">
+            <div class="control-copy">
+                <span class="control-title">智能自动优化</span>
+                <div class="control-desc">根据 CPU 拓扑自动选择前台、后台和调度参数。开启后部分基础项会由自动策略接管。</div>
+            </div>
+            <label class="switch" for="auto_optimize">
+                <input id="auto_optimize" type="checkbox">
+                <i></i>
+            </label>
+        </div>
+
+        <div class="row">
+            <div class="control-copy">
+                <span class="control-title">触控 boost</span>
+                <div class="control-desc">写入内核暴露的 input boost 节点，用来改善触控后的短时响应，默认开启。</div>
+            </div>
+            <label class="switch" for="input_boost">
+                <input id="input_boost" type="checkbox">
+                <i></i>
+            </label>
+        </div>
+
+        <div class="row">
+            <div class="control-copy">
+                <span class="control-title">温控保护</span>
+                <div class="control-desc">超过温度门限后收敛 top-app、foreground 与 background 的算力上限，默认开启。</div>
+            </div>
+            <label class="switch" for="thermal_guard">
+                <input id="thermal_guard" type="checkbox">
+                <i></i>
+            </label>
+        </div>
+
+        <div class="row">
+            <div class="control-copy">
+                <span class="control-title">Vulkan 模式</span>
+                <div class="control-desc">默认关闭。全局模式会改系统渲染属性；按应用模式只对清单里的包名注入。</div>
+            </div>
+            <select id="vk_mode" class="select">
+                <option value="off">关闭</option>
+                <option value="global">全局</option>
+                <option value="per_app">按应用</option>
+            </select>
+        </div>
+
+        <div class="row stack per-app" id="vk_app_mgr" hidden>
+            <div class="control-copy">
+                <span class="control-title">按应用包名</span>
+                <div class="control-desc">每行一个包名，例如 `com.example.game`。保存时会自动去重和排序。</div>
+            </div>
+            <textarea id="app_pkg" class="input" spellcheck="false"></textarea>
+        </div>
+
+        <div class="row stack" id="row_poll">
+            <div class="range-head">
+                <div class="control-copy">
+                    <span class="control-title">fallback 轮询间隔</span>
+                    <div class="control-desc">文件事件没有触发时，daemon 会按这个间隔重新套用配置。</div>
                 </div>
-                <input id="poll_interval" type="range" min="300" max="3600" step="50" value="950" aria-labelledby="poll_title">
+                <span class="value" id="poll_value">950</span>
             </div>
+            <input id="poll_interval" type="range" min="300" max="3600" step="50" value="950">
         </div>
-        <div class="r" id="row_bg">
-            <div class="k"><b id="bg_title"></b></div>
-            <label class="w" for="background_little"><input id="background_little" type="checkbox" aria-labelledby="bg_title"><i></i></label>
-        </div>
-        <div class="r" id="row_lite">
-            <div class="k"><b id="lite_title"></b></div>
-            <label class="w" for="lite_mode"><input id="lite_mode" type="checkbox" aria-labelledby="lite_title"><i></i></label>
-        </div>
-        <div class="r">
-            <div class="stack">
-                <label class="input-label" for="governor_override" id="governor_label">CPU Governor Override</label>
-                <input id="governor_override" class="input-ui" type="text" spellcheck="false">
+    </section>
+
+    <section class="panel" aria-labelledby="advanced_title">
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title" id="advanced_title">高级选项</h2>
+                <div class="panel-note">CPU、内存、I/O、GPU 与底层覆写值放在这里，默认关闭。</div>
             </div>
+            <label class="switch" for="advanced_enabled">
+                <input id="advanced_enabled" type="checkbox">
+                <i></i>
+            </label>
         </div>
-        <div class="r">
-            <div class="stack">
-                <label class="input-label" for="top_app_uclamp_min" id="top_uclamp_label">Top-app Uclamp Min (-1 auto)</label>
-                <input id="top_app_uclamp_min" class="input-ui" type="number" min="-1" max="100" step="1">
+
+        <div id="advanced_panel" class="advanced-panel" hidden>
+            <div class="row">
+                <div class="control-copy">
+                    <span class="control-title">调度器调校</span>
+                    <div class="control-desc">写入 `uclamp`、`schedtune` 与 `schedutil`。不确定设备内核行为时建议保持关闭。</div>
+                </div>
+                <label class="switch" for="scheduler_tune">
+                    <input id="scheduler_tune" type="checkbox">
+                    <i></i>
+                </label>
             </div>
-        </div>
-        <div class="r">
-            <div class="stack">
-                <label class="input-label" for="input_boost_ms" id="input_boost_ms_label">Input Boost Duration (-1 auto)</label>
-                <input id="input_boost_ms" class="input-ui" type="number" min="-1" max="5000" step="10">
+
+            <div class="row">
+                <div class="control-copy">
+                    <span class="control-title">内存调校</span>
+                    <div class="control-desc">调整 MGLRU、swappiness、watermark 与 compaction。低内存设备可谨慎测试。</div>
+                </div>
+                <label class="switch" for="memory_tune">
+                    <input id="memory_tune" type="checkbox">
+                    <i></i>
+                </label>
             </div>
-        </div>
-        <div class="r">
-            <div class="stack">
-                <label class="input-label" for="thermal_throttle_temp" id="thermal_temp_label">Thermal Guard Temp C (-1 auto)</label>
-                <input id="thermal_throttle_temp" class="input-ui" type="number" min="-1" max="95" step="1">
+
+            <div class="row">
+                <div class="control-copy">
+                    <span class="control-title">I/O 队列调校</span>
+                    <div class="control-desc">调整 block queue 的预读、请求队列和亲和性。不同存储实现效果差异较大。</div>
+                </div>
+                <label class="switch" for="io_tune">
+                    <input id="io_tune" type="checkbox">
+                    <i></i>
+                </label>
+            </div>
+
+            <div class="row">
+                <div class="control-copy">
+                    <span class="control-title">GPU 调校</span>
+                    <div class="control-desc">尝试选择常见 GPU devfreq governor。游戏场景可测试，日常建议关闭。</div>
+                </div>
+                <label class="switch" for="gpu_tune">
+                    <input id="gpu_tune" type="checkbox">
+                    <i></i>
+                </label>
+            </div>
+
+            <div class="row">
+                <div class="control-copy">
+                    <span class="control-title">后台小核限制</span>
+                    <div class="control-desc">限制 background 组优先使用小核。省电可能更好，但后台任务可能更慢。</div>
+                </div>
+                <label class="switch" for="background_little">
+                    <input id="background_little" type="checkbox">
+                    <i></i>
+                </label>
+            </div>
+
+            <div class="row">
+                <div class="control-copy">
+                    <span class="control-title">Lite 模式</span>
+                    <div class="control-desc">降低部分调校强度，适合发热明显或续航优先的设备。</div>
+                </div>
+                <label class="switch" for="lite_mode">
+                    <input id="lite_mode" type="checkbox">
+                    <i></i>
+                </label>
+            </div>
+
+            <div class="row stack">
+                <div class="control-copy">
+                    <span class="control-title">高级覆写值</span>
+                    <div class="control-desc">空值或 `-1` 表示使用内置默认。错误数值可能导致性能或稳定性异常。</div>
+                </div>
+                <div class="field-grid">
+                    <div class="field">
+                        <label for="governor_override">CPU Governor</label>
+                        <input id="governor_override" class="input" type="text" placeholder="留空自动" spellcheck="false">
+                    </div>
+                    <div class="field">
+                        <label for="top_app_uclamp_min">Top-app uclamp min</label>
+                        <input id="top_app_uclamp_min" class="input" type="number" min="-1" max="100" step="1">
+                    </div>
+                    <div class="field">
+                        <label for="input_boost_ms">触控 boost 时长 ms</label>
+                        <input id="input_boost_ms" class="input" type="number" min="-1" max="5000" step="10">
+                    </div>
+                    <div class="field">
+                        <label for="thermal_throttle_temp">温控门限 C</label>
+                        <input id="thermal_throttle_temp" class="input" type="number" min="-1" max="95" step="1">
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 </main>
-<div class="x" id="toast" aria-live="polite">Saved</div>
+
+<div class="toast" id="toast" aria-live="polite">已保存</div>
 
 <script>
     const CANONICAL_CONFIG_DIR = "/data/adb/zygisk_omnisched";
     const CANONICAL_CONFIG_PATH = `${CANONICAL_CONFIG_DIR}/config.json`;
     const LEGACY_CONFIG_PATH = "/data/adb/omnisched/config.json";
-    const LANGUAGE_STORAGE_KEY = "omnisched.webui.language";
+    const ADVANCED_STORAGE_KEY = "omnisched.webui.advanced";
     const PACKAGE_NAME_PATTERN = /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$/;
+
     const DEFAULT_STATE = Object.freeze({
         poll_interval_seconds: 950,
-        cpuset: { background_little_core_only: true },
+        cpuset: { background_little_core_only: false },
         render: { vulkan_mode: "off", vulkan_apps: [] },
         power: { policy: "balanced" },
         performance: {
-            lite_mode: false,
             auto_optimize: false,
-            scheduler_tune: true,
-            memory_tune: true,
-            io_tune: true,
-            gpu_tune: true,
+            lite_mode: false,
+            scheduler_tune: false,
+            memory_tune: false,
+            io_tune: false,
+            gpu_tune: false,
             input_boost: true,
             thermal_guard: true
         },
         scheduler: {
-            top_app_uclamp_min: -1
+            top_app_uclamp_min: -1,
+            foreground_uclamp_min: -1,
+            background_uclamp_max: -1,
+            schedutil_up_rate_limit_us: -1,
+            schedutil_down_rate_limit_us: -1,
+            schedutil_iowait_boost: -1
         },
         cpu: {
-            governor_override: ""
+            governor_override: "",
+            foreground_cpuset: "",
+            system_background_cpuset: "",
+            background_cpuset: "",
+            scaling_min_freq_khz: -1,
+            scaling_max_freq_khz: -1
         },
-        input: {
-            boost_ms: -1
-        },
+        input: { boost_ms: -1 },
         thermal: {
-            throttle_temp_c: -1
+            throttle_temp_c: -1,
+            top_app_uclamp_max: -1,
+            foreground_uclamp_max: -1,
+            background_uclamp_max: -1
         }
     });
+
     const AUTO_PROFILE = Object.freeze({
         poll_interval_seconds: 600,
         background_little_core_only: true,
         power_policy: "balanced"
     });
-    const TRANSLATIONS = {
-        "zh-Hant": {
-            pageTitle: "OmniSched",
-            languageLabel: "語言",
-            powerTitle: "電源策略",
-            powerOptions: { powersave: "省電", balanced: "均衡", performance: "效能" },
-            vkTitle: "Vulkan 模式",
-            vkOptions: { off: "關閉", global: "全域", per_app: "分應用" },
-            appListLabel: "分應用套件名",
-            appPlaceholder: "每行一個套件名，例如：\ncom.miHoYo.ys\ncom.example.game",
-            autoTitle: "智慧自動最佳化",
-            schedulerTitle: "調度優化",
-            memoryTitle: "記憶體調校",
-            ioTitle: "I/O 佇列調校",
-            gpuTitle: "GPU 調校",
-            inputTitle: "觸控 Boost",
-            thermalTitle: "溫控保護",
-            pollTitle: "兜底巡檢間隔",
-            bgTitle: "背景小核限制",
-            liteTitle: "Lite 模式",
-            reloadNow: "重新讀取",
-            saveNow: "儲存",
-            resetDefaults: "重置",
-            configPathLabel: "設定檔",
-            sourcePrefix: "讀取來源",
-            sourceMissing: "尚未建立，儲存後會建立",
-            toastLoaded: "設定已重新讀取",
-            toastSaved: "設定已儲存並回讀確認",
-            toastReset: "已恢復預設設定",
-            toastInvalidPackage: "套件名格式不正確",
-            toastBridgeMissing: "無法連接 KernelSU WebUI 執行環境",
-            toastReadFailed: "讀取設定失敗，已使用預設值",
-            toastWriteFailed: "寫入設定失敗"
-        },
-        "zh-Hans": {
-            pageTitle: "OmniSched",
-            languageLabel: "语言",
-            powerTitle: "电源策略",
-            powerOptions: { powersave: "省电", balanced: "均衡", performance: "性能" },
-            vkTitle: "Vulkan 模式",
-            vkOptions: { off: "关闭", global: "全局", per_app: "分应用" },
-            appListLabel: "分应用包名",
-            appPlaceholder: "每行一个包名，例如：\ncom.miHoYo.ys\ncom.example.game",
-            autoTitle: "智能自动优化",
-            schedulerTitle: "调度优化",
-            memoryTitle: "内存调校",
-            ioTitle: "I/O 队列调校",
-            gpuTitle: "GPU 调校",
-            inputTitle: "触控 Boost",
-            thermalTitle: "温控保护",
-            pollTitle: "兜底巡检间隔",
-            bgTitle: "后台小核限制",
-            liteTitle: "Lite 模式",
-            reloadNow: "重新读取",
-            saveNow: "保存",
-            resetDefaults: "重置",
-            configPathLabel: "配置文件",
-            sourcePrefix: "读取来源",
-            sourceMissing: "尚未建立，保存后会建立",
-            toastLoaded: "设置已重新读取",
-            toastSaved: "设置已保存并回读确认",
-            toastReset: "已恢复默认设置",
-            toastInvalidPackage: "包名格式不正确",
-            toastBridgeMissing: "无法连接 KernelSU WebUI 执行环境",
-            toastReadFailed: "读取配置失败，已使用默认值",
-            toastWriteFailed: "写入配置失败"
-        },
-        en: {
-            pageTitle: "OmniSched",
-            languageLabel: "Language",
-            powerTitle: "Power Policy",
-            powerOptions: { powersave: "Battery", balanced: "Balanced", performance: "Performance" },
-            vkTitle: "Vulkan Mode",
-            vkOptions: { off: "Off", global: "Global", per_app: "Per App" },
-            appListLabel: "Per-app package names",
-            appPlaceholder: "One package name per line, for example:\ncom.miHoYo.ys\ncom.example.game",
-            autoTitle: "Smart Auto Optimize",
-            schedulerTitle: "Scheduler Tuning",
-            memoryTitle: "Memory Tuning",
-            ioTitle: "I/O Queue Tuning",
-            gpuTitle: "GPU Tuning",
-            inputTitle: "Input Boost",
-            thermalTitle: "Thermal Guard",
-            pollTitle: "Fallback Poll Interval",
-            bgTitle: "Background Little-Core Limit",
-            liteTitle: "Lite Mode",
-            reloadNow: "Reload",
-            saveNow: "Save",
-            resetDefaults: "Reset",
-            configPathLabel: "Config File",
-            sourcePrefix: "Loaded from",
-            sourceMissing: "Not created yet; saving will create it",
-            toastLoaded: "Settings reloaded",
-            toastSaved: "Settings saved and verified",
-            toastReset: "Defaults restored",
-            toastInvalidPackage: "Invalid package name format",
-            toastBridgeMissing: "KernelSU WebUI bridge is unavailable",
-            toastReadFailed: "Failed to read config; defaults are shown",
-            toastWriteFailed: "Failed to write config"
-        }
-    };
 
-    let activeSourcePath = "";
-    let currentLanguage = "zh-Hant";
-    let toastTimer;
     let state = clone(DEFAULT_STATE);
+    let activeSourcePath = "";
+    let toastTimer;
 
     const $ = id => document.getElementById(id);
-    const languageSelect = $("language");
-    const pollSlider = $("poll_interval");
-    const pollValue = $("poll_value");
-    const powerPolicy = $("power");
-    const vulkanMode = $("vk_mode");
-    const autoOptimize = $("auto_optimize");
-    const schedulerTune = $("scheduler_tune");
-    const memoryTune = $("memory_tune");
-    const ioTune = $("io_tune");
-    const gpuTune = $("gpu_tune");
-    const inputBoost = $("input_boost");
-    const thermalGuard = $("thermal_guard");
-    const backgroundLittle = $("background_little");
-    const liteMode = $("lite_mode");
-    const appInput = $("app_pkg");
-    const governorOverride = $("governor_override");
-    const topAppUclampMin = $("top_app_uclamp_min");
-    const inputBoostMs = $("input_boost_ms");
-    const thermalThrottleTemp = $("thermal_throttle_temp");
-    const configPathNode = $("config_path");
-    const configSourceNode = $("config_source");
-    const vkManager = $("vk_app_mgr");
-    const toastNode = $("toast");
-    const lockableControls = [pollSlider, powerPolicy, backgroundLittle, liteMode];
-    const lockableRows = [$("row_poll"), $("row_power"), $("row_bg"), $("row_lite")];
+    const controls = {
+        bridgeStatus: $("bridge_status"),
+        configPath: $("config_path"),
+        configSource: $("config_source"),
+        reload: $("reload_now"),
+        save: $("save_now"),
+        reset: $("reset_defaults"),
+        power: $("power"),
+        autoOptimize: $("auto_optimize"),
+        vulkanMode: $("vk_mode"),
+        appManager: $("vk_app_mgr"),
+        appPackages: $("app_pkg"),
+        poll: $("poll_interval"),
+        pollValue: $("poll_value"),
+        advancedEnabled: $("advanced_enabled"),
+        advancedPanel: $("advanced_panel"),
+        schedulerTune: $("scheduler_tune"),
+        memoryTune: $("memory_tune"),
+        ioTune: $("io_tune"),
+        gpuTune: $("gpu_tune"),
+        inputBoost: $("input_boost"),
+        thermalGuard: $("thermal_guard"),
+        backgroundLittle: $("background_little"),
+        liteMode: $("lite_mode"),
+        governorOverride: $("governor_override"),
+        topAppUclampMin: $("top_app_uclamp_min"),
+        inputBoostMs: $("input_boost_ms"),
+        thermalThrottleTemp: $("thermal_throttle_temp"),
+        toast: $("toast")
+    };
 
     function clone(value) {
         return JSON.parse(JSON.stringify(value));
@@ -657,84 +781,109 @@
         return Math.min(max, Math.max(min, Math.round(number)));
     }
 
-    function getText() {
-        return TRANSLATIONS[currentLanguage] || TRANSLATIONS["zh-Hant"];
+    function optionalInt(value, fallback, min, max) {
+        const trimmed = String(value ?? "").trim();
+        if (trimmed === "") return fallback;
+        if (trimmed === "-1" && min <= -1) return -1;
+        return clampNumber(trimmed, fallback, min, max);
     }
 
-    function readStoredLanguage() {
-        try {
-            const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-            if (saved && TRANSLATIONS[saved]) return saved;
-        } catch (_) {}
-
-        const browserLanguage = (navigator.language || "").toLowerCase();
-        if (browserLanguage.startsWith("zh-cn") || browserLanguage.startsWith("zh-sg")) return "zh-Hans";
-        if (browserLanguage.startsWith("zh")) return "zh-Hant";
-        if (browserLanguage.startsWith("en")) return "en";
-        return "zh-Hant";
+    function normalizeMode(value, fallback, allowed) {
+        return allowed.includes(value) ? value : fallback;
     }
 
-    function storeLanguage(language) {
-        try {
-            localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
-        } catch (_) {}
+    function sanitizePackages(packages) {
+        return [...new Set(packages.map(value => String(value).trim()).filter(Boolean))]
+            .sort((left, right) => left.localeCompare(right));
     }
 
-    function setSelectOptions(selectNode, options, value) {
-        selectNode.innerHTML = "";
-        Object.entries(options).forEach(([optionValue, label]) => {
-            const option = document.createElement("option");
-            option.value = optionValue;
-            option.textContent = label;
-            selectNode.appendChild(option);
+    function normalizeConfig(rawConfig) {
+        const next = clone(DEFAULT_STATE);
+        const data = rawConfig && typeof rawConfig === "object" ? rawConfig : {};
+        const cpuset = data.cpuset && typeof data.cpuset === "object" ? data.cpuset : {};
+        const render = data.render && typeof data.render === "object" ? data.render : {};
+        const power = data.power && typeof data.power === "object" ? data.power : {};
+        const performance = data.performance && typeof data.performance === "object" ? data.performance : {};
+        const scheduler = data.scheduler && typeof data.scheduler === "object" ? data.scheduler : {};
+        const cpu = data.cpu && typeof data.cpu === "object" ? data.cpu : {};
+        const inputConfig = data.input && typeof data.input === "object" ? data.input : {};
+        const thermal = data.thermal && typeof data.thermal === "object" ? data.thermal : {};
+
+        next.poll_interval_seconds = clampNumber(data.poll_interval_seconds, next.poll_interval_seconds, 300, 3600);
+        next.cpuset.background_little_core_only =
+            typeof cpuset.background_little_core_only === "boolean"
+                ? cpuset.background_little_core_only
+                : next.cpuset.background_little_core_only;
+        next.power.policy = normalizeMode(power.policy, next.power.policy, ["balanced", "performance", "powersave"]);
+
+        Object.keys(next.performance).forEach(key => {
+            if (typeof performance[key] === "boolean") {
+                next.performance[key] = performance[key];
+            }
         });
-        selectNode.value = value;
+
+        if (typeof render.force_vulkan === "boolean") {
+            next.render.vulkan_mode = render.force_vulkan ? "global" : "off";
+        } else {
+            next.render.vulkan_mode = normalizeMode(render.vulkan_mode, next.render.vulkan_mode, ["off", "global", "per_app"]);
+        }
+        next.render.vulkan_apps = Array.isArray(render.vulkan_apps)
+            ? sanitizePackages(render.vulkan_apps.filter(value => typeof value === "string"))
+            : [];
+
+        next.scheduler.top_app_uclamp_min = optionalInt(scheduler.top_app_uclamp_min, next.scheduler.top_app_uclamp_min, -1, 100);
+        next.scheduler.foreground_uclamp_min = optionalInt(scheduler.foreground_uclamp_min, next.scheduler.foreground_uclamp_min, -1, 100);
+        next.scheduler.background_uclamp_max = optionalInt(scheduler.background_uclamp_max, next.scheduler.background_uclamp_max, -1, 100);
+        next.scheduler.schedutil_up_rate_limit_us = optionalInt(scheduler.schedutil_up_rate_limit_us, next.scheduler.schedutil_up_rate_limit_us, -1, 100000);
+        next.scheduler.schedutil_down_rate_limit_us = optionalInt(scheduler.schedutil_down_rate_limit_us, next.scheduler.schedutil_down_rate_limit_us, -1, 100000);
+        next.scheduler.schedutil_iowait_boost = optionalInt(scheduler.schedutil_iowait_boost, next.scheduler.schedutil_iowait_boost, -1, 1);
+
+        next.cpu.governor_override = typeof cpu.governor_override === "string" ? cpu.governor_override.trim() : "";
+        next.cpu.foreground_cpuset = typeof cpu.foreground_cpuset === "string" ? cpu.foreground_cpuset.trim() : "";
+        next.cpu.system_background_cpuset = typeof cpu.system_background_cpuset === "string" ? cpu.system_background_cpuset.trim() : "";
+        next.cpu.background_cpuset = typeof cpu.background_cpuset === "string" ? cpu.background_cpuset.trim() : "";
+        next.cpu.scaling_min_freq_khz = optionalInt(cpu.scaling_min_freq_khz, next.cpu.scaling_min_freq_khz, -1, 10000000);
+        next.cpu.scaling_max_freq_khz = optionalInt(cpu.scaling_max_freq_khz, next.cpu.scaling_max_freq_khz, -1, 10000000);
+
+        next.input.boost_ms = optionalInt(inputConfig.boost_ms, next.input.boost_ms, -1, 5000);
+        next.thermal.throttle_temp_c = optionalInt(thermal.throttle_temp_c, next.thermal.throttle_temp_c, -1, 95);
+        next.thermal.top_app_uclamp_max = optionalInt(thermal.top_app_uclamp_max, next.thermal.top_app_uclamp_max, -1, 100);
+        next.thermal.foreground_uclamp_max = optionalInt(thermal.foreground_uclamp_max, next.thermal.foreground_uclamp_max, -1, 100);
+        next.thermal.background_uclamp_max = optionalInt(thermal.background_uclamp_max, next.thermal.background_uclamp_max, -1, 100);
+
+        return next;
     }
 
-    function applyLanguage() {
-        const text = getText();
-        document.documentElement.lang = currentLanguage;
-        document.title = `Zygisk ${text.pageTitle}`;
-        $("title").textContent = text.pageTitle;
-        $("lang_label").textContent = text.languageLabel;
-        $("power_title").textContent = text.powerTitle;
-        $("vk_title").textContent = text.vkTitle;
-        $("auto_title").textContent = text.autoTitle;
-        $("scheduler_title").textContent = text.schedulerTitle;
-        $("memory_title").textContent = text.memoryTitle;
-        $("io_title").textContent = text.ioTitle;
-        $("gpu_title").textContent = text.gpuTitle;
-        $("input_title").textContent = text.inputTitle;
-        $("thermal_title").textContent = text.thermalTitle;
-        $("poll_title").textContent = text.pollTitle;
-        $("bg_title").textContent = text.bgTitle;
-        $("lite_title").textContent = text.liteTitle;
-        $("governor_label").textContent = "CPU Governor Override";
-        $("top_uclamp_label").textContent = "Top-app Uclamp Min (-1 auto)";
-        $("input_boost_ms_label").textContent = "Input Boost Duration (-1 auto)";
-        $("thermal_temp_label").textContent = "Thermal Guard Temp C (-1 auto)";
-        $("reload_now").textContent = text.reloadNow;
-        $("save_now").textContent = text.saveNow;
-        $("reset_defaults").textContent = text.resetDefaults;
-        $("config_path_label").textContent = text.configPathLabel;
-        $("app_pkg_label").textContent = text.appListLabel;
-        appInput.placeholder = text.appPlaceholder;
-        setSelectOptions(powerPolicy, text.powerOptions, effectivePowerPolicy());
-        setSelectOptions(vulkanMode, text.vkOptions, state.render.vulkan_mode);
-        paintConfigInfo();
+    function parseConfig(raw) {
+        if (!raw.trim()) return clone(DEFAULT_STATE);
+        return normalizeConfig(JSON.parse(raw));
+    }
+
+    function hasAdvancedState(config) {
+        return config.performance.scheduler_tune
+            || config.performance.memory_tune
+            || config.performance.io_tune
+            || config.performance.gpu_tune
+            || config.performance.lite_mode
+            || config.cpuset.background_little_core_only
+            || config.scheduler.top_app_uclamp_min !== -1
+            || config.cpu.governor_override !== ""
+            || config.input.boost_ms !== -1
+            || config.thermal.throttle_temp_c !== -1;
+    }
+
+    function setBusy(isBusy) {
+        [controls.reload, controls.save, controls.reset].forEach(button => {
+            button.disabled = isBusy;
+        });
     }
 
     function showToast(message, isError = false) {
-        toastNode.textContent = message;
-        toastNode.classList.toggle("error", isError);
+        controls.toast.textContent = message;
+        controls.toast.classList.toggle("error", isError);
         clearTimeout(toastTimer);
-        toastNode.classList.add("s");
-        toastTimer = setTimeout(() => toastNode.classList.remove("s"), 2200);
-    }
-
-    function toastFor(key, isError = false) {
-        const text = getText();
-        showToast(text[key] || text.toastSaved, isError);
+        controls.toast.classList.add("show");
+        toastTimer = setTimeout(() => controls.toast.classList.remove("show"), 2400);
     }
 
     function shellQuote(value) {
@@ -747,19 +896,43 @@
         if (typeof result.stdout === "string") return result.stdout;
         if (typeof result.out === "string") return result.out;
         if (typeof result.result === "string") return result.result;
+        if (typeof result.data === "string") return result.data;
+        if (typeof result.output === "string") return result.output;
         return "";
     }
 
+    function normalizeExecError(result) {
+        if (!result || typeof result !== "object") return "";
+        return result.stderr || result.err || result.error || result.message || "";
+    }
+
+    function getShellBridge() {
+        if (window.ksu && typeof window.ksu.exec === "function") {
+            return command => window.ksu.exec(command);
+        }
+        if (window.apatch && typeof window.apatch.exec === "function") {
+            return command => window.apatch.exec(command);
+        }
+        if (window.APatch && typeof window.APatch.exec === "function") {
+            return command => window.APatch.exec(command);
+        }
+        return null;
+    }
+
     async function runShell(command) {
-        if (!window.ksu || typeof window.ksu.exec !== "function") {
-            throw new Error("KSU WebUI bridge unavailable");
+        const bridge = getShellBridge();
+        if (!bridge) {
+            throw new Error("WebUI 执行环境不可用");
         }
 
-        const result = await window.ksu.exec(command);
+        const result = await bridge(command);
         if (result && typeof result === "object") {
-            const code = result.errno ?? result.code ?? result.exitCode;
+            const code = result.errno ?? result.code ?? result.exitCode ?? result.exit_code;
             if (typeof code === "number" && code !== 0) {
-                throw new Error(result.stderr || `command failed: ${code}`);
+                throw new Error(normalizeExecError(result) || `命令执行失败：${code}`);
+            }
+            if (result.success === false || result.ok === false) {
+                throw new Error(normalizeExecError(result) || "命令执行失败");
             }
         }
         return normalizeExecResult(result);
@@ -792,305 +965,178 @@
         await runShell(command);
     }
 
-    function sanitizePackages(packages) {
-        return [...new Set(packages.map(value => String(value).trim()).filter(Boolean))]
-            .sort((left, right) => left.localeCompare(right));
-    }
-
-    function normalizeMode(value, fallback, allowed) {
-        return allowed.includes(value) ? value : fallback;
-    }
-
-    function readOptionalInt(value, fallback, min, max) {
-        const trimmed = String(value ?? "").trim();
-        if (trimmed === "") return fallback;
-        if (trimmed === "-1" && min <= -1) return -1;
-        return clampNumber(trimmed, fallback, min, max);
-    }
-
-    function normalizeConfig(input) {
-        const next = clone(DEFAULT_STATE);
-        const data = input && typeof input === "object" ? input : {};
-        const cpuset = data.cpuset && typeof data.cpuset === "object" ? data.cpuset : {};
-        const render = data.render && typeof data.render === "object" ? data.render : {};
-        const power = data.power && typeof data.power === "object" ? data.power : {};
-        const performance = data.performance && typeof data.performance === "object" ? data.performance : {};
-
-        next.poll_interval_seconds = clampNumber(
-            data.poll_interval_seconds,
-            DEFAULT_STATE.poll_interval_seconds,
-            300,
-            3600
-        );
-        next.cpuset.background_little_core_only =
-            typeof cpuset.background_little_core_only === "boolean"
-                ? cpuset.background_little_core_only
-                : next.cpuset.background_little_core_only;
-        next.power.policy = normalizeMode(power.policy, DEFAULT_STATE.power.policy, ["balanced", "performance", "powersave"]);
-        next.performance.auto_optimize =
-            typeof performance.auto_optimize === "boolean" ? performance.auto_optimize : next.performance.auto_optimize;
-        next.performance.lite_mode =
-            typeof performance.lite_mode === "boolean" ? performance.lite_mode : next.performance.lite_mode;
-        next.performance.scheduler_tune =
-            typeof performance.scheduler_tune === "boolean" ? performance.scheduler_tune : next.performance.scheduler_tune;
-        next.performance.memory_tune =
-            typeof performance.memory_tune === "boolean" ? performance.memory_tune : next.performance.memory_tune;
-        next.performance.io_tune =
-            typeof performance.io_tune === "boolean" ? performance.io_tune : next.performance.io_tune;
-        next.performance.gpu_tune =
-            typeof performance.gpu_tune === "boolean" ? performance.gpu_tune : next.performance.gpu_tune;
-        next.performance.input_boost =
-            typeof performance.input_boost === "boolean" ? performance.input_boost : next.performance.input_boost;
-        next.performance.thermal_guard =
-            typeof performance.thermal_guard === "boolean" ? performance.thermal_guard : next.performance.thermal_guard;
-        next.scheduler.top_app_uclamp_min = readOptionalInt(
-            data.scheduler && typeof data.scheduler === "object" ? data.scheduler.top_app_uclamp_min : next.scheduler.top_app_uclamp_min,
-            next.scheduler.top_app_uclamp_min,
-            -1,
-            100
-        );
-        next.cpu.governor_override =
-            data.cpu && typeof data.cpu === "object" && typeof data.cpu.governor_override === "string"
-                ? data.cpu.governor_override.trim()
-                : next.cpu.governor_override;
-        next.input.boost_ms = readOptionalInt(
-            data.input && typeof data.input === "object" ? data.input.boost_ms : next.input.boost_ms,
-            next.input.boost_ms,
-            -1,
-            5000
-        );
-        next.thermal.throttle_temp_c = readOptionalInt(
-            data.thermal && typeof data.thermal === "object" ? data.thermal.throttle_temp_c : next.thermal.throttle_temp_c,
-            next.thermal.throttle_temp_c,
-            -1,
-            95
-        );
-
-        if (typeof render.force_vulkan === "boolean") {
-            next.render.vulkan_mode = render.force_vulkan ? "global" : "off";
-        } else {
-            next.render.vulkan_mode = normalizeMode(render.vulkan_mode, DEFAULT_STATE.render.vulkan_mode, ["off", "global", "per_app"]);
-        }
-        next.render.vulkan_apps = Array.isArray(render.vulkan_apps)
-            ? sanitizePackages(render.vulkan_apps.filter(value => typeof value === "string"))
-            : [];
-
-        return next;
-    }
-
-    function parseConfig(raw) {
-        if (!raw.trim()) return clone(DEFAULT_STATE);
-        return normalizeConfig(JSON.parse(raw));
-    }
-
-    function readPackagesFromInput() {
-        return sanitizePackages(appInput.value.split(/\r?\n/));
-    }
-
-    function syncAppsFromInput() {
-        const packages = readPackagesFromInput();
-        if (packages.some(packageName => !PACKAGE_NAME_PATTERN.test(packageName))) {
-            toastFor("toastInvalidPackage", true);
-            return false;
-        }
-        state.render.vulkan_apps = packages;
-        appInput.value = packages.join("\n");
-        return true;
-    }
-
-    function buildPersistedState() {
-        const persisted = normalizeConfig(state);
-        persisted.render.vulkan_apps = sanitizePackages(persisted.render.vulkan_apps);
-
-        if (persisted.performance.auto_optimize) {
-            persisted.poll_interval_seconds = AUTO_PROFILE.poll_interval_seconds;
-            persisted.cpuset.background_little_core_only = AUTO_PROFILE.background_little_core_only;
-            persisted.power.policy = AUTO_PROFILE.power_policy;
-        }
-
-        persisted.cpu.governor_override = persisted.cpu.governor_override.trim();
-
-        return persisted;
-    }
-
-    function effectivePowerPolicy() {
-        return state.performance.auto_optimize ? AUTO_PROFILE.power_policy : state.power.policy;
-    }
-
-    function fillRange(node) {
+    function fillRange() {
+        const node = controls.poll;
         node.style.setProperty("--p", `${((node.value - node.min) / (node.max - node.min)) * 100}%`);
     }
 
     function paintConfigInfo() {
-        const text = getText();
-        configPathNode.textContent = CANONICAL_CONFIG_PATH;
-        configSourceNode.textContent = activeSourcePath
-            ? `${text.sourcePrefix}: ${activeSourcePath}`
-            : text.sourceMissing;
+        controls.configPath.textContent = CANONICAL_CONFIG_PATH;
+        controls.configSource.textContent = activeSourcePath
+            ? `读取来源：${activeSourcePath}`
+            : "尚未创建，保存后会生成新配置";
+    }
+
+    function paintAdvanced() {
+        const visible = controls.advancedEnabled.checked;
+        controls.advancedPanel.hidden = !visible;
+        try {
+            localStorage.setItem(ADVANCED_STORAGE_KEY, visible ? "1" : "0");
+        } catch (_) {}
     }
 
     function paint() {
-        const locked = state.performance.auto_optimize;
-        const displayedPoll = locked ? AUTO_PROFILE.poll_interval_seconds : state.poll_interval_seconds;
-        const displayedBackground = locked ? AUTO_PROFILE.background_little_core_only : state.cpuset.background_little_core_only;
+        controls.power.value = state.performance.auto_optimize ? AUTO_PROFILE.power_policy : state.power.policy;
+        controls.autoOptimize.checked = state.performance.auto_optimize;
+        controls.vulkanMode.value = state.render.vulkan_mode;
+        controls.appManager.hidden = state.render.vulkan_mode !== "per_app";
+        controls.appPackages.value = state.render.vulkan_apps.join("\n");
 
-        autoOptimize.checked = locked;
-        schedulerTune.checked = state.performance.scheduler_tune;
-        memoryTune.checked = state.performance.memory_tune;
-        ioTune.checked = state.performance.io_tune;
-        gpuTune.checked = state.performance.gpu_tune;
-        inputBoost.checked = state.performance.input_boost;
-        thermalGuard.checked = state.performance.thermal_guard;
-        pollSlider.value = displayedPoll;
-        pollValue.textContent = displayedPoll;
-        backgroundLittle.checked = displayedBackground;
-        liteMode.checked = state.performance.lite_mode;
-        governorOverride.value = state.cpu.governor_override;
-        topAppUclampMin.value = state.scheduler.top_app_uclamp_min;
-        inputBoostMs.value = state.input.boost_ms;
-        thermalThrottleTemp.value = state.thermal.throttle_temp_c;
-        powerPolicy.value = effectivePowerPolicy();
-        vulkanMode.value = state.render.vulkan_mode;
-        vkManager.hidden = state.render.vulkan_mode !== "per_app";
-        appInput.value = state.render.vulkan_apps.join("\n");
+        const pollValue = state.performance.auto_optimize ? AUTO_PROFILE.poll_interval_seconds : state.poll_interval_seconds;
+        controls.poll.value = pollValue;
+        controls.pollValue.textContent = pollValue;
+        controls.poll.disabled = state.performance.auto_optimize;
+        controls.power.disabled = state.performance.auto_optimize;
+        $("row_poll").classList.toggle("disabled", state.performance.auto_optimize);
 
-        lockableControls.forEach(node => {
-            node.disabled = locked;
-        });
-        lockableRows.forEach(node => {
-            node.classList.toggle("d", locked);
-        });
+        controls.schedulerTune.checked = state.performance.scheduler_tune;
+        controls.memoryTune.checked = state.performance.memory_tune;
+        controls.ioTune.checked = state.performance.io_tune;
+        controls.gpuTune.checked = state.performance.gpu_tune;
+        controls.inputBoost.checked = state.performance.input_boost;
+        controls.thermalGuard.checked = state.performance.thermal_guard;
+        controls.backgroundLittle.checked = state.cpuset.background_little_core_only;
+        controls.liteMode.checked = state.performance.lite_mode;
+        controls.governorOverride.value = state.cpu.governor_override;
+        controls.topAppUclampMin.value = state.scheduler.top_app_uclamp_min;
+        controls.inputBoostMs.value = state.input.boost_ms;
+        controls.thermalThrottleTemp.value = state.thermal.throttle_temp_c;
 
-        fillRange(pollSlider);
+        fillRange();
         paintConfigInfo();
     }
 
+    function readPackagesFromInput() {
+        return sanitizePackages(controls.appPackages.value.split(/\r?\n/));
+    }
+
+    function collectStateFromControls() {
+        state.power.policy = controls.power.value;
+        state.performance.auto_optimize = controls.autoOptimize.checked;
+        state.render.vulkan_mode = controls.vulkanMode.value;
+
+        const packages = readPackagesFromInput();
+        if (packages.some(packageName => !PACKAGE_NAME_PATTERN.test(packageName))) {
+            throw new Error("应用包名格式不正确");
+        }
+        state.render.vulkan_apps = packages;
+
+        state.poll_interval_seconds = clampNumber(controls.poll.value, DEFAULT_STATE.poll_interval_seconds, 300, 3600);
+        state.performance.scheduler_tune = controls.schedulerTune.checked;
+        state.performance.memory_tune = controls.memoryTune.checked;
+        state.performance.io_tune = controls.ioTune.checked;
+        state.performance.gpu_tune = controls.gpuTune.checked;
+        state.performance.input_boost = controls.inputBoost.checked;
+        state.performance.thermal_guard = controls.thermalGuard.checked;
+        state.cpuset.background_little_core_only = controls.backgroundLittle.checked;
+        state.performance.lite_mode = controls.liteMode.checked;
+        state.cpu.governor_override = controls.governorOverride.value.trim();
+        state.scheduler.top_app_uclamp_min = optionalInt(controls.topAppUclampMin.value, -1, -1, 100);
+        state.input.boost_ms = optionalInt(controls.inputBoostMs.value, -1, -1, 5000);
+        state.thermal.throttle_temp_c = optionalInt(controls.thermalThrottleTemp.value, -1, -1, 95);
+
+        if (state.performance.auto_optimize) {
+            state.poll_interval_seconds = AUTO_PROFILE.poll_interval_seconds;
+            state.cpuset.background_little_core_only = AUTO_PROFILE.background_little_core_only;
+            state.power.policy = AUTO_PROFILE.power_policy;
+        }
+
+        return normalizeConfig(state);
+    }
+
+    function refreshBridgeStatus() {
+        const hasBridge = Boolean(getShellBridge());
+        controls.bridgeStatus.textContent = hasBridge ? "WebUI 已连接" : "等待 WebUI 环境";
+        controls.bridgeStatus.style.color = hasBridge ? "var(--primary)" : "var(--warn)";
+    }
+
     async function loadConfig(showSuccess = false) {
+        setBusy(true);
+        refreshBridgeStatus();
         try {
             activeSourcePath = await resolveSourcePath();
             const raw = await readConfigText(activeSourcePath);
             state = parseConfig(raw);
-            if (showSuccess) toastFor("toastLoaded");
+
+            if (hasAdvancedState(state)) {
+                controls.advancedEnabled.checked = true;
+                paintAdvanced();
+            }
+
+            paint();
+            if (showSuccess) showToast("配置已重新读取");
         } catch (error) {
             state = clone(DEFAULT_STATE);
             activeSourcePath = "";
-            toastFor(error.message.includes("bridge") ? "toastBridgeMissing" : "toastReadFailed", true);
+            paint();
+            showToast(error.message || "读取配置失败，已显示默认值", true);
+        } finally {
+            setBusy(false);
         }
-
-        applyLanguage();
-        paint();
     }
 
-    async function saveConfig(toastKey = "toastSaved") {
-        if (!syncAppsFromInput()) return;
-
-        const payload = JSON.stringify(buildPersistedState(), null, 2);
+    async function saveConfig(toastText = "配置已保存并回读确认") {
+        setBusy(true);
+        refreshBridgeStatus();
         try {
+            const payload = JSON.stringify(collectStateFromControls(), null, 2);
             await writeConfigText(payload);
             activeSourcePath = CANONICAL_CONFIG_PATH;
             const raw = await readConfigText(CANONICAL_CONFIG_PATH);
             state = parseConfig(raw);
-            toastFor(toastKey);
-        } catch (_) {
-            toastFor("toastWriteFailed", true);
+            paint();
+            showToast(toastText);
+        } catch (error) {
+            paint();
+            showToast(error.message || "写入配置失败", true);
+        } finally {
+            setBusy(false);
         }
-
-        applyLanguage();
-        paint();
     }
 
     function boot() {
-        currentLanguage = readStoredLanguage();
-        languageSelect.value = currentLanguage;
-        applyLanguage();
+        try {
+            controls.advancedEnabled.checked = localStorage.getItem(ADVANCED_STORAGE_KEY) === "1";
+        } catch (_) {
+            controls.advancedEnabled.checked = false;
+        }
+
+        refreshBridgeStatus();
+        paintAdvanced();
         paint();
         loadConfig(false);
     }
 
-    languageSelect.onchange = () => {
-        currentLanguage = languageSelect.value;
-        storeLanguage(currentLanguage);
-        applyLanguage();
+    controls.poll.oninput = () => {
+        controls.pollValue.textContent = controls.poll.value;
+        fillRange();
+    };
+    controls.vulkanMode.onchange = () => {
+        controls.appManager.hidden = controls.vulkanMode.value !== "per_app";
+    };
+    controls.autoOptimize.onchange = () => {
+        state.performance.auto_optimize = controls.autoOptimize.checked;
         paint();
     };
-    pollSlider.oninput = event => {
-        pollValue.textContent = event.target.value;
-        fillRange(event.target);
-    };
-    pollSlider.onchange = () => {
-        state.poll_interval_seconds = parseInt(pollSlider.value, 10);
-        saveConfig();
-    };
-    backgroundLittle.onchange = () => {
-        state.cpuset.background_little_core_only = backgroundLittle.checked;
-        saveConfig();
-    };
-    liteMode.onchange = () => {
-        state.performance.lite_mode = liteMode.checked;
-        saveConfig();
-    };
-    governorOverride.onchange = () => {
-        state.cpu.governor_override = governorOverride.value.trim();
-        saveConfig();
-    };
-    topAppUclampMin.onchange = () => {
-        state.scheduler.top_app_uclamp_min = readOptionalInt(topAppUclampMin.value, -1, -1, 100);
-        saveConfig();
-    };
-    inputBoostMs.onchange = () => {
-        state.input.boost_ms = readOptionalInt(inputBoostMs.value, -1, -1, 5000);
-        saveConfig();
-    };
-    thermalThrottleTemp.onchange = () => {
-        state.thermal.throttle_temp_c = readOptionalInt(thermalThrottleTemp.value, -1, -1, 95);
-        saveConfig();
-    };
-    autoOptimize.onchange = () => {
-        state.performance.auto_optimize = autoOptimize.checked;
-        saveConfig();
-    };
-    schedulerTune.onchange = () => {
-        state.performance.scheduler_tune = schedulerTune.checked;
-        saveConfig();
-    };
-    memoryTune.onchange = () => {
-        state.performance.memory_tune = memoryTune.checked;
-        saveConfig();
-    };
-    ioTune.onchange = () => {
-        state.performance.io_tune = ioTune.checked;
-        saveConfig();
-    };
-    gpuTune.onchange = () => {
-        state.performance.gpu_tune = gpuTune.checked;
-        saveConfig();
-    };
-    inputBoost.onchange = () => {
-        state.performance.input_boost = inputBoost.checked;
-        saveConfig();
-    };
-    thermalGuard.onchange = () => {
-        state.performance.thermal_guard = thermalGuard.checked;
-        saveConfig();
-    };
-    powerPolicy.onchange = () => {
-        state.power.policy = powerPolicy.value;
-        saveConfig();
-    };
-    vulkanMode.onchange = () => {
-        state.render.vulkan_mode = vulkanMode.value;
-        vkManager.hidden = state.render.vulkan_mode !== "per_app";
-        saveConfig();
-    };
-    appInput.oninput = () => {
-        state.render.vulkan_apps = readPackagesFromInput();
-    };
-    $("reload_now").onclick = () => loadConfig(true);
-    $("save_now").onclick = () => saveConfig();
-    $("reset_defaults").onclick = () => {
+    controls.advancedEnabled.onchange = paintAdvanced;
+    controls.reload.onclick = () => loadConfig(true);
+    controls.save.onclick = () => saveConfig();
+    controls.reset.onclick = () => {
         state = clone(DEFAULT_STATE);
+        controls.advancedEnabled.checked = false;
+        paintAdvanced();
         paint();
-        saveConfig("toastReset");
+        saveConfig("已恢复默认配置");
     };
 
     boot();

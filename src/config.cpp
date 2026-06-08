@@ -31,7 +31,9 @@ std::ifstream open_first_available_config() {
 
 int read_clamped_int(const json& node, const char* key, int fallback, int min_value, int max_value) {
     if (!node.contains(key) || !node[key].is_number_integer()) return fallback;
-    return std::clamp(node[key].get<int>(), min_value, max_value);
+    const int value = node[key].get<int>();
+    if (value == -1 && fallback < 0) return fallback;
+    return std::clamp(value, min_value, max_value);
 }
 
 std::string read_cpuset_value(const json& node, const char* key) {
@@ -95,14 +97,14 @@ void OmniConfig::reload() {
     }
     if (data.contains("performance") && data["performance"].is_object()) {
         auto perfNode = data["performance"];
-        current_config.auto_optimize = perfNode.value("auto_optimize", false);
-        current_config.lite_mode = perfNode.value("lite_mode", false);
-        current_config.scheduler_tune = perfNode.value("scheduler_tune", true);
-        current_config.memory_tune = perfNode.value("memory_tune", true);
-        current_config.io_tune = perfNode.value("io_tune", true);
-        current_config.gpu_tune = perfNode.value("gpu_tune", true);
-        current_config.input_boost = perfNode.value("input_boost", true);
-        current_config.thermal_guard = perfNode.value("thermal_guard", true);
+        current_config.auto_optimize = perfNode.value("auto_optimize", current_config.auto_optimize);
+        current_config.lite_mode = perfNode.value("lite_mode", current_config.lite_mode);
+        current_config.scheduler_tune = perfNode.value("scheduler_tune", current_config.scheduler_tune);
+        current_config.memory_tune = perfNode.value("memory_tune", current_config.memory_tune);
+        current_config.io_tune = perfNode.value("io_tune", current_config.io_tune);
+        current_config.gpu_tune = perfNode.value("gpu_tune", current_config.gpu_tune);
+        current_config.input_boost = perfNode.value("input_boost", current_config.input_boost);
+        current_config.thermal_guard = perfNode.value("thermal_guard", current_config.thermal_guard);
     }
 
     if (data.contains("scheduler") && data["scheduler"].is_object()) {

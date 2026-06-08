@@ -62,7 +62,7 @@ daemon 会监看：
 {
   "poll_interval_seconds": 950,
   "cpuset": {
-    "background_little_core_only": true
+    "background_little_core_only": false
   },
   "render": {
     "vulkan_mode": "off",
@@ -74,10 +74,10 @@ daemon 会监看：
   "performance": {
     "auto_optimize": false,
     "lite_mode": false,
-    "scheduler_tune": true,
-    "memory_tune": true,
-    "io_tune": true,
-    "gpu_tune": true,
+    "scheduler_tune": false,
+    "memory_tune": false,
+    "io_tune": false,
+    "gpu_tune": false,
     "input_boost": true,
     "thermal_guard": true
   },
@@ -138,7 +138,8 @@ daemon 会监看：
 
 - 电源策略
 - auto optimize
-- scheduler、memory、I/O、GPU、input boost、thermal 开关
+- 触控 boost 与温控保护开关（默认开启）
+- 高级选项里的 scheduler、memory、I/O、GPU 开关
 - Vulkan 模式与按应用包名列表
 - fallback 轮询时间
 - 后台小核限制

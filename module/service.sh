@@ -6,7 +6,7 @@ write_default_config() {
 {
   "poll_interval_seconds": 950,
   "cpuset": {
-    "background_little_core_only": true
+    "background_little_core_only": false
   },
   "render": {
     "vulkan_mode": "off",
@@ -18,10 +18,10 @@ write_default_config() {
   "performance": {
     "auto_optimize": false,
     "lite_mode": false,
-    "scheduler_tune": true,
-    "memory_tune": true,
-    "io_tune": true,
-    "gpu_tune": true,
+    "scheduler_tune": false,
+    "memory_tune": false,
+    "io_tune": false,
+    "gpu_tune": false,
     "input_boost": true,
     "thermal_guard": true
   },

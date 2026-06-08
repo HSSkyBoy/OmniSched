@@ -6,7 +6,7 @@ write_default_config() {
 {
   "poll_interval_seconds": 950,
   "cpuset": {
-    "background_little_core_only": true
+    "background_little_core_only": false
   },
   "render": {
     "vulkan_mode": "off",
@@ -18,10 +18,10 @@ write_default_config() {
   "performance": {
     "auto_optimize": false,
     "lite_mode": false,
-    "scheduler_tune": true,
-    "memory_tune": true,
-    "io_tune": true,
-    "gpu_tune": true,
+    "scheduler_tune": false,
+    "memory_tune": false,
+    "io_tune": false,
+    "gpu_tune": false,
     "input_boost": true,
     "thermal_guard": true
   },
@@ -73,11 +73,12 @@ if [ ! -f "$CONFIG_FILE" ] && [ -f "$LEGACY_CONFIG_FILE" ]; then
 fi
 [ -f "$CONFIG_FILE" ] || write_default_config
 
-MEMORY_TUNE="true"
+MEMORY_TUNE="false"
 if [ -f "$CONFIG_FILE" ]; then
     MEMORY_TUNE_VALUE=$(grep -o '"memory_tune"[[:space:]]*:[[:space:]]*\(true\|false\)' "$CONFIG_FILE" 2>/dev/null \
         | tail -n1 \
         | sed 's/.*:[[:space:]]*//')
+    [ "$MEMORY_TUNE_VALUE" = "true" ] && MEMORY_TUNE="true"
     [ "$MEMORY_TUNE_VALUE" = "false" ] && MEMORY_TUNE="false"
 fi
 
