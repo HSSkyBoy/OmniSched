@@ -43,10 +43,6 @@ inline std::string resolved_config_dir() {
         }
     }
 
-    if (file_exists(kStableConfigPath) || file_exists(kStableConfigDir)) {
-        return kStableConfigDir;
-    }
-
     return default_config_dir();
 }
 
@@ -55,25 +51,22 @@ inline std::string resolved_config_path() {
     if (env_path != nullptr && env_path[0] != '\0') {
         return env_path;
     }
-    if (file_exists(kStableConfigPath)) {
-        return kStableConfigPath;
-    }
     return resolved_config_dir() + "/config.json";
 }
 
 inline std::vector<std::string> config_dir_candidates() {
     std::vector<std::string> candidates;
     append_unique(candidates, resolved_config_dir());
-    append_unique(candidates, kStableConfigDir);
     append_unique(candidates, kModuleConfigDir);
+    append_unique(candidates, kStableConfigDir);
     return candidates;
 }
 
 inline std::vector<std::string> config_path_candidates() {
     std::vector<std::string> candidates;
     append_unique(candidates, resolved_config_path());
-    append_unique(candidates, kStableConfigPath);
     append_unique(candidates, kModuleConfigPath);
+    append_unique(candidates, kStableConfigPath);
     return candidates;
 }
 

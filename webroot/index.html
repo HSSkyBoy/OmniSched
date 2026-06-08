@@ -2,513 +2,536 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Zygisk OmniSched</title>
     <style>
         :root {
-            --bg: #05070b;
-            --card: #151922e6;
-            --line: #272d38;
-            --txt: #edf2f7;
-            --sub: #9aa4b2;
-            --on: #2dbb63;
-            --off: #3a4351;
-            --danger: #ff6a55;
-            --accent: #58a6ff;
+            --bg: #0b0c0d;
+            --surface: #151715;
+            --surface-2: #1f221f;
+            --surface-3: #282c28;
+            --line: #353b34;
+            --line-strong: #50574d;
+            --txt: #f6f3eb;
+            --dim: #858b80;
+            --ok: #48d47e;
+            --ok-ink: #06100a;
+            --warn: #f2b95f;
+            --danger: #ff7a66;
+            --accent: #4abcae;
         }
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
+        html {
+            color-scheme: dark;
+        }
         body {
             margin: 0;
-            padding: 14px 12px 30px;
-            font: 14px/1.45 system-ui, sans-serif;
+            min-height: 100dvh;
+            padding: max(10px, env(safe-area-inset-top)) 10px max(18px, env(safe-area-inset-bottom));
             color: var(--txt);
-            background:
-                radial-gradient(circle at top, rgba(88, 166, 255, 0.18), transparent 38%),
-                linear-gradient(#0a0d12, #05070b);
-            min-height: 100vh;
+            background: var(--bg);
+            font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-        .c {
-            max-width: 560px;
-            margin: auto;
-            padding: 18px;
-            border: 1px solid #ffffff12;
-            border-radius: 24px;
-            background: var(--card);
-            box-shadow: 0 22px 56px rgba(0, 0, 0, .45);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
+        button,
+        select,
+        input,
+        textarea {
+            font: inherit;
         }
-        .topbar {
+        .app-shell {
+            width: min(100%, 560px);
+            margin: 0 auto;
+            display: grid;
+            gap: 8px;
+        }
+        .app-header {
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            align-items: flex-start;
-            gap: 12px;
-            flex-wrap: wrap;
+            gap: 10px;
+            padding: 0 2px 2px;
         }
         h1 {
             margin: 0;
-            font-size: 22px;
-        }
-        p {
-            margin: 8px 0 0;
-            color: var(--sub);
-            font-size: 13px;
+            font-size: 21px;
+            line-height: 1.12;
+            font-weight: 750;
+            letter-spacing: 0;
         }
         .lang-wrap {
-            display: flex;
+            display: grid;
+            gap: 4px;
+            min-width: 104px;
+        }
+        .label,
+        .meta-label {
+            color: var(--dim);
+            font-size: 12px;
+            font-weight: 650;
+        }
+        .status-panel,
+        .section {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--surface);
+            overflow: hidden;
+        }
+        .status-panel {
+            display: grid;
+            gap: 8px;
+            padding: 7px 8px;
+            background: var(--surface-2);
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
             align-items: center;
             gap: 8px;
         }
-        .lang-label {
-            color: var(--sub);
+        #config_path,
+        #config_source {
+            margin-top: 2px;
+            color: var(--txt);
             font-size: 12px;
-            white-space: nowrap;
+            overflow-wrap: anywhere;
         }
-        .r {
+        #config_source {
+            color: var(--dim);
+        }
+        .actions {
             display: flex;
-            gap: 12px;
             align-items: center;
-            padding: 14px 0;
-            border-top: 1px solid var(--line);
+            justify-content: flex-end;
+            gap: 6px;
             flex-wrap: wrap;
         }
+        .r {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-top: 1px solid var(--line);
+        }
+        .section > .r:first-child {
+            border-top: 0;
+        }
+        .r.range-row {
+            grid-template-columns: 1fr;
+        }
         .k {
-            flex: 1;
-            min-width: 200px;
+            min-width: 0;
         }
         .k b {
             display: block;
-            font-size: 15px;
-        }
-        .k span {
-            display: block;
-            margin-top: 4px;
-            color: var(--sub);
-            font-size: 12px;
+            font-size: 14px;
+            line-height: 1.35;
+            font-weight: 720;
         }
         .n {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
-            gap: 12px;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 7px;
         }
         .v {
-            font-size: 18px;
-            font-weight: 700;
-            color: #5de08f;
+            min-width: 48px;
+            padding: 2px 6px;
+            border: 1px solid rgba(72, 212, 126, .35);
+            border-radius: 8px;
+            color: var(--ok);
+            background: rgba(72, 212, 126, .09);
+            text-align: center;
+            font-size: 13px;
+            font-weight: 760;
+            font-variant-numeric: tabular-nums;
         }
         .d {
-            opacity: .52;
-            pointer-events: none;
+            opacity: .5;
         }
         .sel-ui,
         .input-ui,
         .btn-ui {
-            border-radius: 10px;
-            font-size: 13px;
+            border-radius: 8px;
+            border: 1px solid var(--line-strong);
+            outline: 0;
         }
         .sel-ui {
-            padding: 8px 12px;
-            background: var(--off);
+            min-width: 104px;
+            min-height: 38px;
+            padding: 6px 9px;
             color: var(--txt);
-            border: 1px solid var(--line);
-            outline: 0;
-            font-weight: 700;
+            background: var(--surface-3);
             cursor: pointer;
+            font-size: 13px;
+            font-weight: 650;
         }
         .input-ui {
-            flex: 1;
-            padding: 9px 12px;
-            border: 1px solid var(--off);
-            background: transparent;
-            color: var(--txt);
+            width: 100%;
             min-width: 0;
+            color: var(--txt);
+            background: #101110;
+        }
+        textarea.input-ui {
+            min-height: 76px;
+            padding: 7px 9px;
+            resize: vertical;
+            line-height: 1.55;
+            font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+            font-size: 12px;
+        }
+        .input-label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--dim);
+            font-size: 12px;
+            font-weight: 650;
         }
         .btn-ui {
-            padding: 9px 16px;
-            border: 0;
-            font-weight: 700;
+            min-height: 38px;
+            padding: 6px 10px;
+            color: var(--ok-ink);
+            background: var(--ok);
             cursor: pointer;
-            transition: .2s;
-            color: #000;
-            background: var(--on);
+            font-size: 13px;
+            font-weight: 760;
+            transition: transform .18s ease, background-color .18s ease, border-color .18s ease;
         }
         .btn-ui.secondary {
-            background: #233040;
             color: var(--txt);
+            background: transparent;
+            border-color: var(--line-strong);
+        }
+        .btn-ui.warning {
+            color: #181007;
+            background: var(--warn);
+            border-color: rgba(242, 185, 95, .8);
         }
         .btn-ui:active {
-            transform: scale(.97);
+            transform: scale(.98);
+        }
+        .btn-ui:focus-visible,
+        .sel-ui:focus-visible,
+        .input-ui:focus-visible,
+        .w input:focus-visible + i {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
         .w {
             position: relative;
-            width: 50px;
-            height: 30px;
+            width: 48px;
+            height: 28px;
             flex: none;
         }
         .w input {
-            opacity: 0;
-            width: 0;
-            height: 0;
             position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
         }
         .w i {
             position: absolute;
             inset: 0;
+            border: 1px solid var(--line-strong);
             border-radius: 999px;
-            background: var(--off);
-            transition: .23s;
+            background: #252824;
+            cursor: pointer;
+            transition: background-color .2s ease, border-color .2s ease;
         }
         .w i:before {
             content: "";
             position: absolute;
             left: 4px;
-            bottom: 4px;
-            width: 22px;
-            height: 22px;
+            top: 4px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
-            background: #f8fafc;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
-            transition: .23s;
+            background: #f6f3eb;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, .38);
+            transition: transform .2s ease;
         }
         input:checked + i {
-            background: var(--on);
+            border-color: rgba(72, 212, 126, .7);
+            background: rgba(72, 212, 126, .9);
         }
         input:checked + i:before {
-            transform: translateX(18px);
+            transform: translateX(20px);
         }
         input[type=range] {
-            -webkit-appearance: none;
-            appearance: none;
             width: 100%;
-            height: 8px;
+            height: 7px;
             border-radius: 999px;
-            background: linear-gradient(to right, var(--on) var(--p, 0%), #445062 var(--p, 0%));
             outline: 0;
+            appearance: none;
+            -webkit-appearance: none;
+            background: linear-gradient(to right, var(--ok) var(--p, 0%), #3a3d38 var(--p, 0%));
         }
         input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--surface);
             border-radius: 50%;
-            background: #f8fafc;
-            border: 4px solid var(--on);
-            box-shadow: 0 4px 10px rgba(45, 187, 99, .28);
+            background: var(--ok);
+            box-shadow: 0 0 0 1px rgba(72, 212, 126, .55);
+            -webkit-appearance: none;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border: 3px solid var(--surface);
+            border-radius: 50%;
+            background: var(--ok);
+            box-shadow: 0 0 0 1px rgba(72, 212, 126, .55);
         }
         input[disabled],
-        input[disabled] + i {
+        input[disabled] + i,
+        select[disabled] {
             cursor: not-allowed;
-            filter: grayscale(.8);
+            filter: grayscale(.65);
         }
         .stack {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-            flex-wrap: wrap;
-        }
-        .app-list {
+            grid-column: 1 / -1;
             width: 100%;
         }
-        .app-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            background: #202632;
-            padding: 10px 14px;
-            border-radius: 10px;
-            font-size: 13px;
-            margin-top: 8px;
-            border: 1px solid var(--line);
-        }
-        .app-item span {
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .app-item button {
-            background: transparent;
-            color: var(--danger);
-            border: 0;
-            cursor: pointer;
-            font-weight: 700;
-            padding: 4px 8px;
-        }
-        .hint {
-            margin-top: 14px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            border: 1px solid var(--line);
-            background: rgba(15, 19, 26, .72);
-            color: var(--sub);
-            font-size: 12px;
-        }
-        .hint strong {
-            color: var(--accent);
-        }
-        .actions {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-            margin-top: 2px;
-            flex-wrap: wrap;
+        .stack[hidden] {
+            display: none;
         }
         .x {
             position: fixed;
             left: 50%;
-            bottom: 30px;
-            transform: translate(-50%, 16px);
-            padding: 10px 16px;
+            bottom: max(22px, env(safe-area-inset-bottom));
+            z-index: 20;
+            max-width: calc(100vw - 28px);
+            padding: 9px 13px;
+            border: 1px solid rgba(246, 243, 235, .12);
             border-radius: 999px;
-            background: #0f131ad9;
-            color: #f8fafc;
-            font-size: 13px;
+            color: var(--txt);
+            background: rgba(19, 20, 18, .94);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, .32);
             opacity: 0;
             visibility: hidden;
-            transition: .25s;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            transform: translate(-50%, 12px);
+            transition: opacity .2s ease, transform .2s ease, visibility .2s ease;
+            font-size: 13px;
         }
         .x.s {
             opacity: 1;
             visibility: visible;
             transform: translate(-50%, 0);
         }
+        .x.error {
+            border-color: rgba(255, 122, 102, .35);
+            color: #ffe2dc;
+        }
+        @media (max-width: 560px) {
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+            .lang-wrap,
+            .sel-ui,
+            .actions,
+            .btn-ui {
+                width: 100%;
+            }
+            .actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+            .sel-ui {
+                min-width: 0;
+            }
+            .w {
+                justify-self: end;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                transition-duration: .01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="c">
-    <div class="topbar">
-        <div>
-            <h1 id="title">OmniSched</h1>
-            <p id="subtitle"></p>
-        </div>
-        <div class="lang-wrap">
-            <span class="lang-label" id="lang_label"></span>
-            <select id="language" class="sel-ui">
+<main class="app-shell">
+    <header class="app-header">
+        <h1 id="title">OmniSched</h1>
+        <label class="lang-wrap" for="language">
+            <span class="label" id="lang_label"></span>
+            <select id="language" class="sel-ui" aria-labelledby="lang_label">
                 <option value="zh-Hant">繁中</option>
                 <option value="zh-Hans">简中</option>
                 <option value="en">English</option>
             </select>
-        </div>
-    </div>
+        </label>
+    </header>
 
-    <div class="r" id="row_power">
-        <div class="k">
-            <b id="power_title"></b>
-            <span id="power_desc"></span>
-        </div>
-        <select id="power" class="sel-ui"></select>
-    </div>
-
-    <div class="r">
-        <div class="k">
-            <b id="vk_title"></b>
-            <span id="vk_desc"></span>
-        </div>
-        <select id="vk_mode" class="sel-ui"></select>
-        <div id="vk_app_mgr" class="stack" style="display:none">
-            <input type="text" id="app_pkg" class="input-ui">
-            <button id="add_app" class="btn-ui"></button>
-            <div id="app_list" class="app-list"></div>
-        </div>
-    </div>
-
-    <div class="r">
-        <div class="k">
-            <b id="auto_title"></b>
-            <span id="auto_desc"></span>
-        </div>
-        <label class="w"><input id="auto_optimize" type="checkbox"><i></i></label>
-    </div>
-
-    <div class="r" id="row_poll">
-        <div class="k">
-            <div class="n">
-                <b id="poll_title"></b>
-                <span class="v" id="poll_value">950</span>
+    <section class="status-panel" aria-labelledby="config_path_label">
+        <div class="status-grid">
+            <div>
+                <div class="meta-label" id="config_path_label"></div>
+                <div id="config_path"></div>
+                <div id="config_source"></div>
             </div>
-            <input id="poll_interval" type="range" min="300" max="3600" step="50" value="950">
+            <div class="actions">
+                <button id="reload_now" class="btn-ui secondary" type="button"></button>
+                <button id="save_now" class="btn-ui" type="button"></button>
+                <button id="reset_defaults" class="btn-ui warning" type="button"></button>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <div class="r" id="row_bg">
-        <div class="k">
-            <b id="bg_title"></b>
-            <span id="bg_desc"></span>
+    <section class="section">
+        <div class="r" id="row_power">
+            <div class="k"><b id="power_title"></b></div>
+            <select id="power" class="sel-ui" aria-labelledby="power_title"></select>
         </div>
-        <label class="w"><input id="background_little" type="checkbox"><i></i></label>
-    </div>
-
-    <div class="r" id="row_lite">
-        <div class="k">
-            <b id="lite_title"></b>
-            <span id="lite_desc"></span>
+        <div class="r">
+            <div class="k"><b id="auto_title"></b></div>
+            <label class="w" for="auto_optimize"><input id="auto_optimize" type="checkbox" aria-labelledby="auto_title"><i></i></label>
         </div>
-        <label class="w"><input id="lite_mode" type="checkbox"><i></i></label>
-    </div>
-
-    <div class="actions">
-        <button id="save_now" class="btn-ui"></button>
-        <button id="reset_defaults" class="btn-ui secondary"></button>
-    </div>
-
-    <div class="hint">
-        <div><strong id="config_path_label"></strong></div>
-        <div id="config_path">Checking...</div>
-    </div>
-</div>
-<div class="x" id="toast">Saved</div>
+        <div class="r">
+            <div class="k"><b id="vk_title"></b></div>
+            <select id="vk_mode" class="sel-ui" aria-labelledby="vk_title"></select>
+            <div id="vk_app_mgr" class="stack" hidden>
+                <label class="input-label" for="app_pkg" id="app_pkg_label"></label>
+                <textarea id="app_pkg" class="input-ui" spellcheck="false"></textarea>
+            </div>
+        </div>
+        <div class="r range-row" id="row_poll">
+            <div class="k">
+                <div class="n">
+                    <b id="poll_title"></b>
+                    <span class="v" id="poll_value">950</span>
+                </div>
+                <input id="poll_interval" type="range" min="300" max="3600" step="50" value="950" aria-labelledby="poll_title">
+            </div>
+        </div>
+        <div class="r" id="row_bg">
+            <div class="k"><b id="bg_title"></b></div>
+            <label class="w" for="background_little"><input id="background_little" type="checkbox" aria-labelledby="bg_title"><i></i></label>
+        </div>
+        <div class="r" id="row_lite">
+            <div class="k"><b id="lite_title"></b></div>
+            <label class="w" for="lite_mode"><input id="lite_mode" type="checkbox" aria-labelledby="lite_title"><i></i></label>
+        </div>
+    </section>
+</main>
+<div class="x" id="toast" aria-live="polite">Saved</div>
 
 <script>
-    const LEGACY_CONFIG_DIR = "/data/adb/omnisched";
-    const MODULE_CONFIG_DIR = "/data/adb/zygisk_omnisched";
-    const LEGACY_CONFIG_PATH = `${LEGACY_CONFIG_DIR}/config.json`;
-    const MODULE_CONFIG_PATH = `${MODULE_CONFIG_DIR}/config.json`;
+    const CANONICAL_CONFIG_DIR = "/data/adb/zygisk_omnisched";
+    const CANONICAL_CONFIG_PATH = `${CANONICAL_CONFIG_DIR}/config.json`;
+    const LEGACY_CONFIG_PATH = "/data/adb/omnisched/config.json";
     const LANGUAGE_STORAGE_KEY = "omnisched.webui.language";
-    const DEFAULT_STATE = {
+    const PACKAGE_NAME_PATTERN = /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$/;
+    const DEFAULT_STATE = Object.freeze({
         poll_interval_seconds: 950,
         cpuset: { background_little_core_only: true },
         render: { vulkan_mode: "off", vulkan_apps: [] },
         power: { policy: "balanced" },
         performance: { lite_mode: false, auto_optimize: false }
-    };
-    const AUTO_PROFILE = {
+    });
+    const AUTO_PROFILE = Object.freeze({
         poll_interval_seconds: 600,
         background_little_core_only: true,
         power_policy: "balanced"
-    };
-    const PACKAGE_NAME_PATTERN = /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$/;
+    });
     const TRANSLATIONS = {
         "zh-Hant": {
             pageTitle: "OmniSched",
-            subtitle: "設定會直接寫入目前使用中的配置檔，daemon 與 Zygisk 共用同一份資料來源。",
             languageLabel: "語言",
             powerTitle: "電源策略",
-            powerDesc: "快速切換省電、均衡與效能導向的 CPU 調度強度。",
-            powerOptions: {
-                powersave: "省電",
-                balanced: "均衡",
-                performance: "效能"
-            },
+            powerOptions: { powersave: "省電", balanced: "均衡", performance: "效能" },
             vkTitle: "Vulkan 模式",
-            vkDesc: "`per_app` 只會對指定 App 注入 Vulkan 環境，不會全域強推。",
-            vkOptions: {
-                off: "關閉",
-                global: "全域",
-                per_app: "分應用"
-            },
-            appPlaceholder: "輸入套件名，例如 com.miHoYo.ys",
-            addApp: "新增",
-            removeApp: "移除",
+            vkOptions: { off: "關閉", global: "全域", per_app: "分應用" },
+            appListLabel: "分應用套件名",
+            appPlaceholder: "每行一個套件名，例如：\ncom.miHoYo.ys\ncom.example.game",
             autoTitle: "智慧自動最佳化",
-            autoDesc: "啟用後會套用較保守的輪詢與背景限制，優先確保穩定性。",
             pollTitle: "兜底巡檢間隔",
             bgTitle: "背景小核限制",
-            bgDesc: "優先把背景程序留在小核；若裝置沒有小核資訊，會自動退回安全配置。",
             liteTitle: "Lite 模式",
-            liteDesc: "降低 governor 與 GPU 調整強度，適合想保守使用的人。",
-            saveNow: "立即儲存",
-            resetDefaults: "重置預設",
-            configPathLabel: "目前設定檔",
-            configPathLoading: "檢查中...",
-            toastSaved: "設定已儲存",
-            toastReapplied: "設定已重新套用",
+            reloadNow: "重新讀取",
+            saveNow: "儲存",
+            resetDefaults: "重置",
+            configPathLabel: "設定檔",
+            sourcePrefix: "讀取來源",
+            sourceMissing: "尚未建立，儲存後會建立",
+            toastLoaded: "設定已重新讀取",
+            toastSaved: "設定已儲存並回讀確認",
             toastReset: "已恢復預設設定",
-            toastAppAdded: "已加入 Vulkan 名單",
-            toastAppRemoved: "已移除套件",
-            toastInvalidPackage: "套件名格式不正確"
+            toastInvalidPackage: "套件名格式不正確",
+            toastBridgeMissing: "無法連接 KernelSU WebUI 執行環境",
+            toastReadFailed: "讀取設定失敗，已使用預設值",
+            toastWriteFailed: "寫入設定失敗"
         },
         "zh-Hans": {
             pageTitle: "OmniSched",
-            subtitle: "设置会直接写入当前使用中的配置文件，daemon 与 Zygisk 共用同一份数据来源。",
             languageLabel: "语言",
             powerTitle: "电源策略",
-            powerDesc: "快速切换省电、均衡与性能导向的 CPU 调度强度。",
-            powerOptions: {
-                powersave: "省电",
-                balanced: "均衡",
-                performance: "性能"
-            },
+            powerOptions: { powersave: "省电", balanced: "均衡", performance: "性能" },
             vkTitle: "Vulkan 模式",
-            vkDesc: "`per_app` 只会对指定 App 注入 Vulkan 环境，不会全局强推。",
-            vkOptions: {
-                off: "关闭",
-                global: "全局",
-                per_app: "分应用"
-            },
-            appPlaceholder: "输入包名，例如 com.miHoYo.ys",
-            addApp: "新增",
-            removeApp: "移除",
+            vkOptions: { off: "关闭", global: "全局", per_app: "分应用" },
+            appListLabel: "分应用包名",
+            appPlaceholder: "每行一个包名，例如：\ncom.miHoYo.ys\ncom.example.game",
             autoTitle: "智能自动优化",
-            autoDesc: "启用后会套用更保守的轮询与后台限制，优先确保稳定性。",
             pollTitle: "兜底巡检间隔",
             bgTitle: "后台小核限制",
-            bgDesc: "优先把后台进程留在小核；如果设备没有小核信息，会自动回退到安全配置。",
             liteTitle: "Lite 模式",
-            liteDesc: "降低 governor 与 GPU 调整强度，适合偏保守使用的人。",
-            saveNow: "立即保存",
-            resetDefaults: "重置默认",
-            configPathLabel: "当前配置文件",
-            configPathLoading: "检查中...",
-            toastSaved: "设置已保存",
-            toastReapplied: "设置已重新套用",
+            reloadNow: "重新读取",
+            saveNow: "保存",
+            resetDefaults: "重置",
+            configPathLabel: "配置文件",
+            sourcePrefix: "读取来源",
+            sourceMissing: "尚未建立，保存后会建立",
+            toastLoaded: "设置已重新读取",
+            toastSaved: "设置已保存并回读确认",
             toastReset: "已恢复默认设置",
-            toastAppAdded: "已加入 Vulkan 列表",
-            toastAppRemoved: "已移除包名",
-            toastInvalidPackage: "包名格式不正确"
+            toastInvalidPackage: "包名格式不正确",
+            toastBridgeMissing: "无法连接 KernelSU WebUI 执行环境",
+            toastReadFailed: "读取配置失败，已使用默认值",
+            toastWriteFailed: "写入配置失败"
         },
         en: {
             pageTitle: "OmniSched",
-            subtitle: "Settings are written directly to the active config file shared by the daemon and Zygisk.",
             languageLabel: "Language",
             powerTitle: "Power Policy",
-            powerDesc: "Quickly switch CPU scheduling behavior between battery, balanced, and performance modes.",
-            powerOptions: {
-                powersave: "Battery",
-                balanced: "Balanced",
-                performance: "Performance"
-            },
+            powerOptions: { powersave: "Battery", balanced: "Balanced", performance: "Performance" },
             vkTitle: "Vulkan Mode",
-            vkDesc: "`per_app` injects the Vulkan environment only into selected apps instead of forcing it system-wide.",
-            vkOptions: {
-                off: "Off",
-                global: "Global",
-                per_app: "Per App"
-            },
-            appPlaceholder: "Enter package name, for example com.miHoYo.ys",
-            addApp: "Add",
-            removeApp: "Remove",
+            vkOptions: { off: "Off", global: "Global", per_app: "Per App" },
+            appListLabel: "Per-app package names",
+            appPlaceholder: "One package name per line, for example:\ncom.miHoYo.ys\ncom.example.game",
             autoTitle: "Smart Auto Optimize",
-            autoDesc: "Uses a more conservative polling interval and background policy to prioritize stability.",
             pollTitle: "Fallback Poll Interval",
             bgTitle: "Background Little-Core Limit",
-            bgDesc: "Keeps background tasks on little cores when possible, with safe fallback behavior on unknown topologies.",
             liteTitle: "Lite Mode",
-            liteDesc: "Reduces governor and GPU tuning intensity for a more conservative profile.",
-            saveNow: "Save Now",
-            resetDefaults: "Reset Defaults",
-            configPathLabel: "Active Config File",
-            configPathLoading: "Checking...",
-            toastSaved: "Settings saved",
-            toastReapplied: "Settings reapplied",
+            reloadNow: "Reload",
+            saveNow: "Save",
+            resetDefaults: "Reset",
+            configPathLabel: "Config File",
+            sourcePrefix: "Loaded from",
+            sourceMissing: "Not created yet; saving will create it",
+            toastLoaded: "Settings reloaded",
+            toastSaved: "Settings saved and verified",
             toastReset: "Defaults restored",
-            toastAppAdded: "Added to Vulkan list",
-            toastAppRemoved: "Removed package",
-            toastInvalidPackage: "Invalid package name format"
+            toastInvalidPackage: "Invalid package name format",
+            toastBridgeMissing: "KernelSU WebUI bridge is unavailable",
+            toastReadFailed: "Failed to read config; defaults are shown",
+            toastWriteFailed: "Failed to write config"
         }
     };
 
-    let activeConfigDir = MODULE_CONFIG_DIR;
-    let activeConfigPath = MODULE_CONFIG_PATH;
+    let activeSourcePath = "";
     let currentLanguage = "zh-Hant";
     let toastTimer;
     let state = clone(DEFAULT_STATE);
 
     const $ = id => document.getElementById(id);
-    const titleNode = $("title");
-    const subtitleNode = $("subtitle");
-    const languageLabelNode = $("lang_label");
     const languageSelect = $("language");
     const pollSlider = $("poll_interval");
     const pollValue = $("poll_value");
@@ -518,39 +541,44 @@
     const backgroundLittle = $("background_little");
     const liteMode = $("lite_mode");
     const appInput = $("app_pkg");
-    const appList = $("app_list");
     const configPathNode = $("config_path");
+    const configSourceNode = $("config_source");
     const vkManager = $("vk_app_mgr");
     const toastNode = $("toast");
     const lockableControls = [pollSlider, powerPolicy, backgroundLittle, liteMode];
-    const lockableRows = [
-        $("row_poll"),
-        $("row_power"),
-        $("row_bg"),
-        $("row_lite")
-    ];
+    const lockableRows = [$("row_poll"), $("row_power"), $("row_bg"), $("row_lite")];
 
     function clone(value) {
         return JSON.parse(JSON.stringify(value));
     }
 
-    function fillRange(node) {
-        node.style.setProperty("--p", `${((node.value - node.min) / (node.max - node.min)) * 100}%`);
+    function clampNumber(value, fallback, min, max) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return fallback;
+        return Math.min(max, Math.max(min, Math.round(number)));
     }
 
     function getText() {
         return TRANSLATIONS[currentLanguage] || TRANSLATIONS["zh-Hant"];
     }
 
-    function detectLanguage() {
-        const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-        if (saved && TRANSLATIONS[saved]) return saved;
+    function readStoredLanguage() {
+        try {
+            const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+            if (saved && TRANSLATIONS[saved]) return saved;
+        } catch (_) {}
 
         const browserLanguage = (navigator.language || "").toLowerCase();
         if (browserLanguage.startsWith("zh-cn") || browserLanguage.startsWith("zh-sg")) return "zh-Hans";
         if (browserLanguage.startsWith("zh")) return "zh-Hant";
         if (browserLanguage.startsWith("en")) return "en";
         return "zh-Hant";
+    }
+
+    function storeLanguage(language) {
+        try {
+            localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+        } catch (_) {}
     }
 
     function setSelectOptions(selectNode, options, value) {
@@ -566,89 +594,162 @@
 
     function applyLanguage() {
         const text = getText();
-
         document.documentElement.lang = currentLanguage;
-        titleNode.textContent = text.pageTitle;
-        subtitleNode.textContent = text.subtitle;
-        languageLabelNode.textContent = text.languageLabel;
+        document.title = `Zygisk ${text.pageTitle}`;
+        $("title").textContent = text.pageTitle;
+        $("lang_label").textContent = text.languageLabel;
         $("power_title").textContent = text.powerTitle;
-        $("power_desc").textContent = text.powerDesc;
         $("vk_title").textContent = text.vkTitle;
-        $("vk_desc").textContent = text.vkDesc;
         $("auto_title").textContent = text.autoTitle;
-        $("auto_desc").textContent = text.autoDesc;
         $("poll_title").textContent = text.pollTitle;
         $("bg_title").textContent = text.bgTitle;
-        $("bg_desc").textContent = text.bgDesc;
         $("lite_title").textContent = text.liteTitle;
-        $("lite_desc").textContent = text.liteDesc;
+        $("reload_now").textContent = text.reloadNow;
         $("save_now").textContent = text.saveNow;
         $("reset_defaults").textContent = text.resetDefaults;
         $("config_path_label").textContent = text.configPathLabel;
+        $("app_pkg_label").textContent = text.appListLabel;
         appInput.placeholder = text.appPlaceholder;
-        $("add_app").textContent = text.addApp;
-
-        if (!activeConfigPath) {
-            configPathNode.textContent = text.configPathLoading;
-        }
-
-        setSelectOptions(powerPolicy, text.powerOptions, state.power.policy);
+        setSelectOptions(powerPolicy, text.powerOptions, effectivePowerPolicy());
         setSelectOptions(vulkanMode, text.vkOptions, state.render.vulkan_mode);
-        paintAppList();
+        paintConfigInfo();
     }
 
-    function showToast(message) {
+    function showToast(message, isError = false) {
         toastNode.textContent = message;
+        toastNode.classList.toggle("error", isError);
         clearTimeout(toastTimer);
         toastNode.classList.add("s");
-        toastTimer = setTimeout(() => toastNode.classList.remove("s"), 1800);
+        toastTimer = setTimeout(() => toastNode.classList.remove("s"), 2200);
     }
 
-    function toastFor(key) {
+    function toastFor(key, isError = false) {
         const text = getText();
-        showToast(text[key] || text.toastSaved);
+        showToast(text[key] || text.toastSaved, isError);
     }
 
-    function shellEscape(value) {
-        return value.replace(/'/g, "'\\''");
+    function shellQuote(value) {
+        return `'${String(value).replace(/'/g, "'\\''")}'`;
     }
 
-    async function exec(command) {
-        const result = await ksu.exec(command);
-        return typeof result === "string" ? result : (result?.stdout || "");
+    function normalizeExecResult(result) {
+        if (typeof result === "string") return result;
+        if (!result || typeof result !== "object") return "";
+        if (typeof result.stdout === "string") return result.stdout;
+        if (typeof result.out === "string") return result.out;
+        if (typeof result.result === "string") return result.result;
+        return "";
     }
 
-    async function pathExists(path) {
-        const output = (await exec(`[ -e ${path} ] && echo 1 || echo 0`)).trim();
-        return output === "1";
-    }
-
-    async function resolveActiveConfigTarget() {
-        if (await pathExists(LEGACY_CONFIG_PATH)) {
-            activeConfigDir = LEGACY_CONFIG_DIR;
-            activeConfigPath = LEGACY_CONFIG_PATH;
-            return;
+    async function runShell(command) {
+        if (!window.ksu || typeof window.ksu.exec !== "function") {
+            throw new Error("KSU WebUI bridge unavailable");
         }
-        if (await pathExists(MODULE_CONFIG_PATH)) {
-            activeConfigDir = MODULE_CONFIG_DIR;
-            activeConfigPath = MODULE_CONFIG_PATH;
-            return;
+
+        const result = await window.ksu.exec(command);
+        if (result && typeof result === "object") {
+            const code = result.errno ?? result.code ?? result.exitCode;
+            if (typeof code === "number" && code !== 0) {
+                throw new Error(result.stderr || `command failed: ${code}`);
+            }
         }
-        if (await pathExists(LEGACY_CONFIG_DIR)) {
-            activeConfigDir = LEGACY_CONFIG_DIR;
-            activeConfigPath = LEGACY_CONFIG_PATH;
-            return;
-        }
-        activeConfigDir = MODULE_CONFIG_DIR;
-        activeConfigPath = MODULE_CONFIG_PATH;
+        return normalizeExecResult(result);
+    }
+
+    async function fileExists(path) {
+        const output = await runShell(`[ -f ${shellQuote(path)} ] && printf 1 || printf 0`);
+        return output.trim() === "1";
+    }
+
+    async function resolveSourcePath() {
+        if (await fileExists(CANONICAL_CONFIG_PATH)) return CANONICAL_CONFIG_PATH;
+        if (await fileExists(LEGACY_CONFIG_PATH)) return LEGACY_CONFIG_PATH;
+        return "";
+    }
+
+    async function readConfigText(path) {
+        if (!path) return "";
+        return runShell(`cat ${shellQuote(path)}`);
+    }
+
+    async function writeConfigText(payload) {
+        const tmpPath = `${CANONICAL_CONFIG_PATH}.tmp`;
+        const command = [
+            `mkdir -p ${shellQuote(CANONICAL_CONFIG_DIR)}`,
+            `printf '%s\\n' ${shellQuote(payload)} > ${shellQuote(tmpPath)}`,
+            `mv ${shellQuote(tmpPath)} ${shellQuote(CANONICAL_CONFIG_PATH)}`,
+            `chmod 0644 ${shellQuote(CANONICAL_CONFIG_PATH)}`
+        ].join(" && ");
+        await runShell(command);
     }
 
     function sanitizePackages(packages) {
-        return [...new Set(packages.map(value => value.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+        return [...new Set(packages.map(value => String(value).trim()).filter(Boolean))]
+            .sort((left, right) => left.localeCompare(right));
+    }
+
+    function normalizeMode(value, fallback, allowed) {
+        return allowed.includes(value) ? value : fallback;
+    }
+
+    function normalizeConfig(input) {
+        const next = clone(DEFAULT_STATE);
+        const data = input && typeof input === "object" ? input : {};
+        const cpuset = data.cpuset && typeof data.cpuset === "object" ? data.cpuset : {};
+        const render = data.render && typeof data.render === "object" ? data.render : {};
+        const power = data.power && typeof data.power === "object" ? data.power : {};
+        const performance = data.performance && typeof data.performance === "object" ? data.performance : {};
+
+        next.poll_interval_seconds = clampNumber(
+            data.poll_interval_seconds,
+            DEFAULT_STATE.poll_interval_seconds,
+            300,
+            3600
+        );
+        next.cpuset.background_little_core_only =
+            typeof cpuset.background_little_core_only === "boolean"
+                ? cpuset.background_little_core_only
+                : next.cpuset.background_little_core_only;
+        next.power.policy = normalizeMode(power.policy, DEFAULT_STATE.power.policy, ["balanced", "performance", "powersave"]);
+        next.performance.auto_optimize =
+            typeof performance.auto_optimize === "boolean" ? performance.auto_optimize : next.performance.auto_optimize;
+        next.performance.lite_mode =
+            typeof performance.lite_mode === "boolean" ? performance.lite_mode : next.performance.lite_mode;
+
+        if (typeof render.force_vulkan === "boolean") {
+            next.render.vulkan_mode = render.force_vulkan ? "global" : "off";
+        } else {
+            next.render.vulkan_mode = normalizeMode(render.vulkan_mode, DEFAULT_STATE.render.vulkan_mode, ["off", "global", "per_app"]);
+        }
+        next.render.vulkan_apps = Array.isArray(render.vulkan_apps)
+            ? sanitizePackages(render.vulkan_apps.filter(value => typeof value === "string"))
+            : [];
+
+        return next;
+    }
+
+    function parseConfig(raw) {
+        if (!raw.trim()) return clone(DEFAULT_STATE);
+        return normalizeConfig(JSON.parse(raw));
+    }
+
+    function readPackagesFromInput() {
+        return sanitizePackages(appInput.value.split(/\r?\n/));
+    }
+
+    function syncAppsFromInput() {
+        const packages = readPackagesFromInput();
+        if (packages.some(packageName => !PACKAGE_NAME_PATTERN.test(packageName))) {
+            toastFor("toastInvalidPackage", true);
+            return false;
+        }
+        state.render.vulkan_apps = packages;
+        appInput.value = packages.join("\n");
+        return true;
     }
 
     function buildPersistedState() {
-        const persisted = clone(state);
+        const persisted = normalizeConfig(state);
         persisted.render.vulkan_apps = sanitizePackages(persisted.render.vulkan_apps);
 
         if (persisted.performance.auto_optimize) {
@@ -660,16 +761,20 @@
         return persisted;
     }
 
-    function paintAppList() {
-        const text = getText();
-        appList.innerHTML = "";
+    function effectivePowerPolicy() {
+        return state.performance.auto_optimize ? AUTO_PROFILE.power_policy : state.power.policy;
+    }
 
-        state.render.vulkan_apps.forEach((packageName, index) => {
-            const item = document.createElement("div");
-            item.className = "app-item";
-            item.innerHTML = `<span>${packageName}</span><button type="button" data-index="${index}">${text.removeApp}</button>`;
-            appList.appendChild(item);
-        });
+    function fillRange(node) {
+        node.style.setProperty("--p", `${((node.value - node.min) / (node.max - node.min)) * 100}%`);
+    }
+
+    function paintConfigInfo() {
+        const text = getText();
+        configPathNode.textContent = CANONICAL_CONFIG_PATH;
+        configSourceNode.textContent = activeSourcePath
+            ? `${text.sourcePrefix}: ${activeSourcePath}`
+            : text.sourceMissing;
     }
 
     function paint() {
@@ -682,10 +787,10 @@
         pollValue.textContent = displayedPoll;
         backgroundLittle.checked = displayedBackground;
         liteMode.checked = state.performance.lite_mode;
-        powerPolicy.value = locked ? AUTO_PROFILE.power_policy : state.power.policy;
+        powerPolicy.value = effectivePowerPolicy();
         vulkanMode.value = state.render.vulkan_mode;
-        vkManager.style.display = state.render.vulkan_mode === "per_app" ? "flex" : "none";
-        configPathNode.textContent = activeConfigPath || getText().configPathLoading;
+        vkManager.hidden = state.render.vulkan_mode !== "per_app";
+        appInput.value = state.render.vulkan_apps.join("\n");
 
         lockableControls.forEach(node => {
             node.disabled = locked;
@@ -695,116 +800,98 @@
         });
 
         fillRange(pollSlider);
-        paintAppList();
+        paintConfigInfo();
     }
 
-    async function save(toastKey = "toastSaved") {
-        const persisted = buildPersistedState();
-        const payload = shellEscape(JSON.stringify(persisted, null, 2));
-        await exec(`mkdir -p ${activeConfigDir} && printf '%s\n' '${payload}' > ${activeConfigPath}.tmp && mv ${activeConfigPath}.tmp ${activeConfigPath}`);
-        state.render.vulkan_apps = persisted.render.vulkan_apps;
-        toastFor(toastKey);
+    async function loadConfig(showSuccess = false) {
+        try {
+            activeSourcePath = await resolveSourcePath();
+            const raw = await readConfigText(activeSourcePath);
+            state = parseConfig(raw);
+            if (showSuccess) toastFor("toastLoaded");
+        } catch (error) {
+            state = clone(DEFAULT_STATE);
+            activeSourcePath = "";
+            toastFor(error.message.includes("bridge") ? "toastBridgeMissing" : "toastReadFailed", true);
+        }
+
+        applyLanguage();
         paint();
     }
 
-    async function load() {
-        currentLanguage = detectLanguage();
+    async function saveConfig(toastKey = "toastSaved") {
+        if (!syncAppsFromInput()) return;
+
+        const payload = JSON.stringify(buildPersistedState(), null, 2);
+        try {
+            await writeConfigText(payload);
+            activeSourcePath = CANONICAL_CONFIG_PATH;
+            const raw = await readConfigText(CANONICAL_CONFIG_PATH);
+            state = parseConfig(raw);
+            toastFor(toastKey);
+        } catch (_) {
+            toastFor("toastWriteFailed", true);
+        }
+
+        applyLanguage();
+        paint();
+    }
+
+    function boot() {
+        currentLanguage = readStoredLanguage();
         languageSelect.value = currentLanguage;
         applyLanguage();
-
-        await resolveActiveConfigTarget();
-
-        try {
-            const raw = (await exec(`cat ${activeConfigPath}`)).trim();
-            if (raw.startsWith("{")) {
-                const parsed = JSON.parse(raw);
-                state = clone(DEFAULT_STATE);
-                state.poll_interval_seconds = parsed.poll_interval_seconds ?? state.poll_interval_seconds;
-                state.cpuset.background_little_core_only =
-                    parsed.cpuset?.background_little_core_only ?? state.cpuset.background_little_core_only;
-                state.performance.auto_optimize =
-                    parsed.performance?.auto_optimize ?? state.performance.auto_optimize;
-                state.performance.lite_mode =
-                    parsed.performance?.lite_mode ?? state.performance.lite_mode;
-                state.render.vulkan_mode = typeof parsed.render?.force_vulkan === "boolean"
-                    ? (parsed.render.force_vulkan ? "global" : "off")
-                    : (parsed.render?.vulkan_mode ?? state.render.vulkan_mode);
-                state.render.vulkan_apps = sanitizePackages(parsed.render?.vulkan_apps ?? []);
-                state.power.policy = parsed.power?.policy ?? state.power.policy;
-            }
-        } catch (_) {}
-
-        applyLanguage();
         paint();
+        loadConfig(false);
     }
 
     languageSelect.onchange = () => {
         currentLanguage = languageSelect.value;
-        localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage);
+        storeLanguage(currentLanguage);
         applyLanguage();
         paint();
     };
-
     pollSlider.oninput = event => {
         pollValue.textContent = event.target.value;
         fillRange(event.target);
     };
     pollSlider.onchange = () => {
         state.poll_interval_seconds = parseInt(pollSlider.value, 10);
-        save();
+        saveConfig();
     };
     backgroundLittle.onchange = () => {
         state.cpuset.background_little_core_only = backgroundLittle.checked;
-        save();
+        saveConfig();
     };
     liteMode.onchange = () => {
         state.performance.lite_mode = liteMode.checked;
-        save();
+        saveConfig();
     };
     autoOptimize.onchange = () => {
         state.performance.auto_optimize = autoOptimize.checked;
-        save();
+        saveConfig();
     };
     powerPolicy.onchange = () => {
         state.power.policy = powerPolicy.value;
-        save();
+        saveConfig();
     };
     vulkanMode.onchange = () => {
         state.render.vulkan_mode = vulkanMode.value;
-        paint();
-        save();
+        vkManager.hidden = state.render.vulkan_mode !== "per_app";
+        saveConfig();
     };
-
-    $("add_app").onclick = () => {
-        const packageName = appInput.value.trim();
-        if (!packageName) return;
-        if (!PACKAGE_NAME_PATTERN.test(packageName)) {
-            toastFor("toastInvalidPackage");
-            return;
-        }
-        if (!state.render.vulkan_apps.includes(packageName)) {
-            state.render.vulkan_apps.push(packageName);
-            appInput.value = "";
-            save("toastAppAdded");
-        }
+    appInput.oninput = () => {
+        state.render.vulkan_apps = readPackagesFromInput();
     };
-
-    appList.onclick = event => {
-        const button = event.target.closest("button[data-index]");
-        if (!button) return;
-        const index = parseInt(button.dataset.index, 10);
-        state.render.vulkan_apps.splice(index, 1);
-        save("toastAppRemoved");
-    };
-
-    $("save_now").onclick = () => save("toastReapplied");
+    $("reload_now").onclick = () => loadConfig(true);
+    $("save_now").onclick = () => saveConfig();
     $("reset_defaults").onclick = () => {
         state = clone(DEFAULT_STATE);
         paint();
-        save("toastReset");
+        saveConfig("toastReset");
     };
 
-    load();
+    boot();
 </script>
 </body>
 </html>
