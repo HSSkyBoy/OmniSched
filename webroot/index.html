@@ -970,18 +970,29 @@
 
     async function readConfigText(path) {
         if (!path) return "";
-        const encoded = await runShell(`base64 ${shellQuote(path)} | tr -d '\\n'`);
+        const quotedPath = shellQuote(path);
+        const encoded = await runShell(
+            `base64 ${quotedPath} 2>/dev/null || toybox base64 ${quotedPath} 2>/dev/null || busybox base64 ${quotedPath}`
+        );
+        if (!encoded.trim()) {
+            throw new Error("配置文件读取为空");
+        }
         return base64ToUtf8(encoded);
     }
 
     async function writeConfigText(payload) {
         const tmpPath = `${CANONICAL_CONFIG_PATH}.tmp`;
+        const b64Path = `${CANONICAL_CONFIG_PATH}.b64`;
         const encoded = utf8ToBase64(payload);
+        const quotedB64 = shellQuote(b64Path);
+        const quotedTmp = shellQuote(tmpPath);
         const command = [
             `mkdir -p ${shellQuote(CANONICAL_CONFIG_DIR)}`,
-            `printf '%s' ${shellQuote(encoded)} | base64 -d > ${shellQuote(tmpPath)}`,
-            `mv ${shellQuote(tmpPath)} ${shellQuote(CANONICAL_CONFIG_PATH)}`,
-            `chmod 0644 ${shellQuote(CANONICAL_CONFIG_PATH)}`
+            `printf '%s' ${shellQuote(encoded)} > ${quotedB64}`,
+            `(base64 -d ${quotedB64} > ${quotedTmp} 2>/dev/null || base64 --decode ${quotedB64} > ${quotedTmp} 2>/dev/null || toybox base64 -d ${quotedB64} > ${quotedTmp} 2>/dev/null || busybox base64 -d ${quotedB64} > ${quotedTmp})`,
+            `mv ${quotedTmp} ${shellQuote(CANONICAL_CONFIG_PATH)}`,
+            `chmod 0644 ${shellQuote(CANONICAL_CONFIG_PATH)}`,
+            `rm -f ${quotedB64}`
         ].join(" && ");
         await runShell(command);
     }
