@@ -1,6 +1,6 @@
 id=zygisk_omnisched
 name=Zygisk OmniSched
-version=v4.0.0
-versionCode=40
+version=v4.0.1
+versionCode=41
 author=HSSkyBoy & @nikobe918
 description=基於 NeoZygisk 的 Android 調度和 Vulkan 優化模組。
