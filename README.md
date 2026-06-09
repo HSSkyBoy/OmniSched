@@ -138,7 +138,7 @@ daemon 会监看：
 
 - 电源策略
 - auto optimize
-- 触控 boost 与温控保护开关（默认开启）
+- 触控 boost 与温控保护开关
 - 高级选项里的 scheduler、memory、I/O、GPU 开关
 - Vulkan 模式与按应用包名列表
 - fallback 轮询时间

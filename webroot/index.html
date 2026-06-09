@@ -492,7 +492,7 @@
         <div class="panel-head">
             <div>
                 <h2 class="panel-title" id="basic_title">基础设置</h2>
-                <div class="panel-note">基础项偏向日常稳定，触控 boost 与温控保护默认开启。</div>
+                <div class="panel-note">常用功能集中在这里，适合日常快速调整。</div>
             </div>
         </div>
 
@@ -522,7 +522,7 @@
         <div class="row">
             <div class="control-copy">
                 <span class="control-title">触控 boost</span>
-                <div class="control-desc">写入内核暴露的 input boost 节点，用来改善触控后的短时响应，默认开启。</div>
+                <div class="control-desc">写入内核暴露的 input boost 节点，用来改善触控后的短时响应。</div>
             </div>
             <label class="switch" for="input_boost">
                 <input id="input_boost" type="checkbox">
@@ -533,7 +533,7 @@
         <div class="row">
             <div class="control-copy">
                 <span class="control-title">温控保护</span>
-                <div class="control-desc">超过温度门限后收敛 top-app、foreground 与 background 的算力上限，默认开启。</div>
+                <div class="control-desc">超过温度门限后收敛 top-app、foreground 与 background 的算力上限。</div>
             </div>
             <label class="switch" for="thermal_guard">
                 <input id="thermal_guard" type="checkbox">
@@ -544,7 +544,7 @@
         <div class="row">
             <div class="control-copy">
                 <span class="control-title">Vulkan 模式</span>
-                <div class="control-desc">默认关闭。全局模式会改系统渲染属性；按应用模式只对清单里的包名注入。</div>
+                <div class="control-desc">全局模式会改系统渲染属性；按应用模式只对清单里的包名注入。</div>
             </div>
             <select id="vk_mode" class="select">
                 <option value="off">关闭</option>
@@ -577,7 +577,7 @@
         <div class="panel-head">
             <div>
                 <h2 class="panel-title" id="advanced_title">高级选项</h2>
-                <div class="panel-note">CPU、内存、I/O、GPU 与底层覆写值放在这里，默认关闭。</div>
+                <div class="panel-note">需要更细的 CPU、内存、I/O、GPU 与底层覆写值时再展开。</div>
             </div>
             <label class="switch" for="advanced_enabled">
                 <input id="advanced_enabled" type="checkbox">
