@@ -856,7 +856,11 @@
 
     function parseConfig(raw) {
         if (!raw.trim()) return clone(DEFAULT_STATE);
-        return normalizeConfig(JSON.parse(raw));
+        try {
+            return normalizeConfig(JSON.parse(raw));
+        } catch (_) {
+            throw new Error("配置文件不是有效 JSON，已显示默认值，保存后会覆盖损坏配置");
+        }
     }
 
     function hasAdvancedState(config) {
@@ -888,6 +892,21 @@
 
     function shellQuote(value) {
         return `'${String(value).replace(/'/g, "'\\''")}'`;
+    }
+
+    function utf8ToBase64(value) {
+        const bytes = new TextEncoder().encode(value);
+        let binary = "";
+        bytes.forEach(byte => {
+            binary += String.fromCharCode(byte);
+        });
+        return btoa(binary);
+    }
+
+    function base64ToUtf8(value) {
+        const binary = atob(String(value).replace(/\s+/g, ""));
+        const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+        return new TextDecoder().decode(bytes);
     }
 
     function normalizeExecResult(result) {
@@ -951,14 +970,16 @@
 
     async function readConfigText(path) {
         if (!path) return "";
-        return runShell(`cat ${shellQuote(path)}`);
+        const encoded = await runShell(`base64 ${shellQuote(path)} | tr -d '\\n'`);
+        return base64ToUtf8(encoded);
     }
 
     async function writeConfigText(payload) {
         const tmpPath = `${CANONICAL_CONFIG_PATH}.tmp`;
+        const encoded = utf8ToBase64(payload);
         const command = [
             `mkdir -p ${shellQuote(CANONICAL_CONFIG_DIR)}`,
-            `printf '%s\\n' ${shellQuote(payload)} > ${shellQuote(tmpPath)}`,
+            `printf '%s' ${shellQuote(encoded)} | base64 -d > ${shellQuote(tmpPath)}`,
             `mv ${shellQuote(tmpPath)} ${shellQuote(CANONICAL_CONFIG_PATH)}`,
             `chmod 0644 ${shellQuote(CANONICAL_CONFIG_PATH)}`
         ].join(" && ");
