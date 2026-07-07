@@ -685,7 +685,8 @@
 <script>
     const CANONICAL_CONFIG_DIR = "/data/adb/zygisk_omnisched";
     const CANONICAL_CONFIG_PATH = `${CANONICAL_CONFIG_DIR}/config.json`;
-    const LEGACY_CONFIG_PATH = "/data/adb/omnisched/config.json";
+    const LEGACY_CONFIG_DIR = "/data/adb/omnisched";
+    const LEGACY_CONFIG_PATH = `${LEGACY_CONFIG_DIR}/config.json`;
     const ADVANCED_STORAGE_KEY = "omnisched.webui.advanced";
     const PACKAGE_NAME_PATTERN = /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$/;
 
@@ -737,6 +738,7 @@
 
     let state = clone(DEFAULT_STATE);
     let activeSourcePath = "";
+    let activeWritePath = CANONICAL_CONFIG_PATH;
     let toastTimer;
 
     const $ = id => document.getElementById(id);
@@ -962,10 +964,50 @@
         return output.trim() === "1";
     }
 
-    async function resolveSourcePath() {
-        if (await fileExists(CANONICAL_CONFIG_PATH)) return CANONICAL_CONFIG_PATH;
-        if (await fileExists(LEGACY_CONFIG_PATH)) return LEGACY_CONFIG_PATH;
-        return "";
+    async function readRuntimeConfigHints() {
+        const output = await runShell(
+            "printf 'OMNISCHED_CONFIG_PATH=%s\\nOMNISCHED_CONFIG_DIR=%s\\n' \"${OMNISCHED_CONFIG_PATH:-}\" \"${OMNISCHED_CONFIG_DIR:-}\""
+        );
+        const hints = { path: "", dir: "" };
+
+        output.split(/\r?\n/).forEach(line => {
+            if (line.startsWith("OMNISCHED_CONFIG_PATH=")) {
+                hints.path = line.slice("OMNISCHED_CONFIG_PATH=".length).trim();
+            } else if (line.startsWith("OMNISCHED_CONFIG_DIR=")) {
+                hints.dir = line.slice("OMNISCHED_CONFIG_DIR=".length).trim();
+            }
+        });
+
+        return hints;
+    }
+
+    function appendCandidate(candidates, path) {
+        if (!path || candidates.includes(path)) return;
+        candidates.push(path);
+    }
+
+    async function resolveConfigPaths() {
+        const hints = await readRuntimeConfigHints();
+        const readCandidates = [];
+
+        appendCandidate(readCandidates, hints.path);
+        appendCandidate(readCandidates, hints.dir ? `${hints.dir}/config.json` : "");
+        appendCandidate(readCandidates, CANONICAL_CONFIG_PATH);
+        appendCandidate(readCandidates, LEGACY_CONFIG_PATH);
+
+        let sourcePath = "";
+        for (const candidate of readCandidates) {
+            if (await fileExists(candidate)) {
+                sourcePath = candidate;
+                break;
+            }
+        }
+
+        const writePath = hints.path
+            || (hints.dir ? `${hints.dir}/config.json` : "")
+            || CANONICAL_CONFIG_PATH;
+
+        return { sourcePath, writePath };
     }
 
     async function readConfigText(path) {
@@ -980,18 +1022,21 @@
         return base64ToUtf8(encoded);
     }
 
-    async function writeConfigText(payload) {
-        const tmpPath = `${CANONICAL_CONFIG_PATH}.tmp`;
-        const b64Path = `${CANONICAL_CONFIG_PATH}.b64`;
+    async function writeConfigText(path, payload) {
+        const targetPath = path || CANONICAL_CONFIG_PATH;
+        const lastSlashIndex = targetPath.lastIndexOf("/");
+        const targetDir = lastSlashIndex > 0 ? targetPath.slice(0, lastSlashIndex) : CANONICAL_CONFIG_DIR;
+        const tmpPath = `${targetPath}.tmp`;
+        const b64Path = `${targetPath}.b64`;
         const encoded = utf8ToBase64(payload);
         const quotedB64 = shellQuote(b64Path);
         const quotedTmp = shellQuote(tmpPath);
         const command = [
-            `mkdir -p ${shellQuote(CANONICAL_CONFIG_DIR)}`,
+            `mkdir -p ${shellQuote(targetDir)}`,
             `printf '%s' ${shellQuote(encoded)} > ${quotedB64}`,
             `(base64 -d ${quotedB64} > ${quotedTmp} 2>/dev/null || base64 --decode ${quotedB64} > ${quotedTmp} 2>/dev/null || toybox base64 -d ${quotedB64} > ${quotedTmp} 2>/dev/null || busybox base64 -d ${quotedB64} > ${quotedTmp})`,
-            `mv ${quotedTmp} ${shellQuote(CANONICAL_CONFIG_PATH)}`,
-            `chmod 0644 ${shellQuote(CANONICAL_CONFIG_PATH)}`,
+            `mv ${quotedTmp} ${shellQuote(targetPath)}`,
+            `chmod 0644 ${shellQuote(targetPath)}`,
             `rm -f ${quotedB64}`
         ].join(" && ");
         await runShell(command);
@@ -1003,7 +1048,7 @@
     }
 
     function paintConfigInfo() {
-        controls.configPath.textContent = CANONICAL_CONFIG_PATH;
+        controls.configPath.textContent = activeWritePath;
         controls.configSource.textContent = activeSourcePath
             ? `读取来源：${activeSourcePath}`
             : "尚未创建，保存后会生成新配置";
@@ -1096,7 +1141,9 @@
         setBusy(true);
         refreshBridgeStatus();
         try {
-            activeSourcePath = await resolveSourcePath();
+            const resolvedPaths = await resolveConfigPaths();
+            activeSourcePath = resolvedPaths.sourcePath;
+            activeWritePath = resolvedPaths.writePath;
             const raw = await readConfigText(activeSourcePath);
             state = parseConfig(raw);
 
@@ -1110,6 +1157,7 @@
         } catch (error) {
             state = clone(DEFAULT_STATE);
             activeSourcePath = "";
+            activeWritePath = CANONICAL_CONFIG_PATH;
             paint();
             showToast(error.message || "读取配置失败，已显示默认值", true);
         } finally {
@@ -1122,9 +1170,11 @@
         refreshBridgeStatus();
         try {
             const payload = JSON.stringify(collectStateFromControls(), null, 2);
-            await writeConfigText(payload);
-            activeSourcePath = CANONICAL_CONFIG_PATH;
-            const raw = await readConfigText(CANONICAL_CONFIG_PATH);
+            const resolvedPaths = await resolveConfigPaths();
+            activeWritePath = resolvedPaths.writePath;
+            await writeConfigText(activeWritePath, payload);
+            activeSourcePath = activeWritePath;
+            const raw = await readConfigText(activeWritePath);
             state = parseConfig(raw);
             paint();
             showToast(toastText);
