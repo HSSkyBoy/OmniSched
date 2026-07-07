@@ -34,6 +34,12 @@ struct ThermalConfig {
     int background_uclamp_max = -1;
 };
 
+struct DisplayConfig {
+    bool short_video_refresh_rate_enabled = false;
+    int short_video_refresh_rate_hz = 30;
+    std::vector<std::string> short_video_apps;
+};
+
 struct OmniConfig {
     int poll_interval_seconds = 950;
 
@@ -54,6 +60,7 @@ struct OmniConfig {
     CpuControlConfig cpu;
     InputBoostConfig input;
     ThermalConfig thermal;
+    DisplayConfig display;
 
     static const OmniConfig& get();
     static void reload();

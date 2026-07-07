@@ -26,6 +26,7 @@ OmniSched 是一个面向 Android 12+ 的 Root 性能模块，主要由三部分
 - 在内核支持时启用 input boost 相关节点
 - 通过 thermal guard 在高温时收敛调度激进度
 - 支持全局 Vulkan 属性模式与按应用 Vulkan 注入模式
+- 支持短视频应用前台 30Hz 刷新率限制
 
 ## 工作方式
 
@@ -105,6 +106,11 @@ daemon 会监看：
     "top_app_uclamp_max": -1,
     "foreground_uclamp_max": -1,
     "background_uclamp_max": -1
+  },
+  "display": {
+    "short_video_refresh_rate_enabled": false,
+    "short_video_refresh_rate_hz": 30,
+    "short_video_apps": []
   }
 }
 ```
@@ -119,6 +125,7 @@ daemon 会监看：
 - `cpu.*`：cpuset、governor、频率上下限覆写参数
 - `input.boost_ms`：input boost 时长覆写
 - `thermal.*`：thermal guard 温度门限与 clamp 上限覆写
+- `display.short_video_*`：短视频前台命中时的刷新率限制与包名列表
 
 大多数覆写字段使用 `-1` 表示“使用 OmniSched 内置默认值”。
 
@@ -141,6 +148,7 @@ daemon 会监看：
 - 触控 boost 与温控保护开关
 - 高级选项里的 scheduler、memory、I/O、GPU 开关
 - Vulkan 模式与按应用包名列表
+- 短视频 30 帧限制与包名列表
 - fallback 轮询时间
 - 后台小核限制
 - lite mode

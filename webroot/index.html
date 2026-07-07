@@ -561,6 +561,25 @@
             <textarea id="app_pkg" class="input" spellcheck="false"></textarea>
         </div>
 
+        <div class="row">
+            <div class="control-copy">
+                <span class="control-title">短视频 30 帧限制</span>
+                <div class="control-desc">当前台应用命中列表时，临时把系统刷新率限制到 30Hz，离开后自动恢复。</div>
+            </div>
+            <label class="switch" for="short_video_refresh_rate_enabled">
+                <input id="short_video_refresh_rate_enabled" type="checkbox">
+                <i></i>
+            </label>
+        </div>
+
+        <div class="row stack" id="short_video_app_mgr">
+            <div class="control-copy">
+                <span class="control-title">短视频包名</span>
+                <div class="control-desc">每行一个包名，命中时会把全局刷新率暂时限制到 30Hz。</div>
+            </div>
+            <textarea id="short_video_pkg" class="input" spellcheck="false"></textarea>
+        </div>
+
         <div class="row stack" id="row_poll">
             <div class="range-head">
                 <div class="control-copy">
@@ -694,6 +713,7 @@
         poll_interval_seconds: 950,
         cpuset: { background_little_core_only: false },
         render: { vulkan_mode: "off", vulkan_apps: [] },
+        display: { short_video_refresh_rate_enabled: false, short_video_refresh_rate_hz: 30, short_video_apps: [] },
         power: { policy: "balanced" },
         performance: {
             auto_optimize: false,
@@ -754,6 +774,9 @@
         vulkanMode: $("vk_mode"),
         appManager: $("vk_app_mgr"),
         appPackages: $("app_pkg"),
+        shortVideoRefreshRateEnabled: $("short_video_refresh_rate_enabled"),
+        shortVideoAppManager: $("short_video_app_mgr"),
+        shortVideoPackages: $("short_video_pkg"),
         poll: $("poll_interval"),
         pollValue: $("poll_value"),
         advancedEnabled: $("advanced_enabled"),
@@ -804,6 +827,7 @@
         const data = rawConfig && typeof rawConfig === "object" ? rawConfig : {};
         const cpuset = data.cpuset && typeof data.cpuset === "object" ? data.cpuset : {};
         const render = data.render && typeof data.render === "object" ? data.render : {};
+        const display = data.display && typeof data.display === "object" ? data.display : {};
         const power = data.power && typeof data.power === "object" ? data.power : {};
         const performance = data.performance && typeof data.performance === "object" ? data.performance : {};
         const scheduler = data.scheduler && typeof data.scheduler === "object" ? data.scheduler : {};
@@ -831,6 +855,19 @@
         }
         next.render.vulkan_apps = Array.isArray(render.vulkan_apps)
             ? sanitizePackages(render.vulkan_apps.filter(value => typeof value === "string"))
+            : [];
+        next.display.short_video_refresh_rate_enabled =
+            typeof display.short_video_refresh_rate_enabled === "boolean"
+                ? display.short_video_refresh_rate_enabled
+                : next.display.short_video_refresh_rate_enabled;
+        next.display.short_video_refresh_rate_hz = optionalInt(
+            display.short_video_refresh_rate_hz,
+            next.display.short_video_refresh_rate_hz,
+            24,
+            60
+        );
+        next.display.short_video_apps = Array.isArray(display.short_video_apps)
+            ? sanitizePackages(display.short_video_apps.filter(value => typeof value === "string"))
             : [];
 
         next.scheduler.top_app_uclamp_min = optionalInt(scheduler.top_app_uclamp_min, next.scheduler.top_app_uclamp_min, -1, 100);
@@ -1068,6 +1105,9 @@
         controls.vulkanMode.value = state.render.vulkan_mode;
         controls.appManager.hidden = state.render.vulkan_mode !== "per_app";
         controls.appPackages.value = state.render.vulkan_apps.join("\n");
+        controls.shortVideoRefreshRateEnabled.checked = state.display.short_video_refresh_rate_enabled;
+        controls.shortVideoAppManager.hidden = !state.display.short_video_refresh_rate_enabled;
+        controls.shortVideoPackages.value = state.display.short_video_apps.join("\n");
 
         const pollValue = state.performance.auto_optimize ? AUTO_PROFILE.poll_interval_seconds : state.poll_interval_seconds;
         controls.poll.value = pollValue;
@@ -1097,6 +1137,10 @@
         return sanitizePackages(controls.appPackages.value.split(/\r?\n/));
     }
 
+    function readShortVideoPackagesFromInput() {
+        return sanitizePackages(controls.shortVideoPackages.value.split(/\r?\n/));
+    }
+
     function collectStateFromControls() {
         state.power.policy = controls.power.value;
         state.performance.auto_optimize = controls.autoOptimize.checked;
@@ -1107,6 +1151,14 @@
             throw new Error("应用包名格式不正确");
         }
         state.render.vulkan_apps = packages;
+
+        const shortVideoPackages = readShortVideoPackagesFromInput();
+        if (shortVideoPackages.some(packageName => !PACKAGE_NAME_PATTERN.test(packageName))) {
+            throw new Error("短视频包名格式不正确");
+        }
+        state.display.short_video_refresh_rate_enabled = controls.shortVideoRefreshRateEnabled.checked;
+        state.display.short_video_refresh_rate_hz = DEFAULT_STATE.display.short_video_refresh_rate_hz;
+        state.display.short_video_apps = shortVideoPackages;
 
         state.poll_interval_seconds = clampNumber(controls.poll.value, DEFAULT_STATE.poll_interval_seconds, 300, 3600);
         state.performance.scheduler_tune = controls.schedulerTune.checked;
@@ -1205,6 +1257,9 @@
     };
     controls.vulkanMode.onchange = () => {
         controls.appManager.hidden = controls.vulkanMode.value !== "per_app";
+    };
+    controls.shortVideoRefreshRateEnabled.onchange = () => {
+        controls.shortVideoAppManager.hidden = !controls.shortVideoRefreshRateEnabled.checked;
     };
     controls.autoOptimize.onchange = () => {
         state.performance.auto_optimize = controls.autoOptimize.checked;

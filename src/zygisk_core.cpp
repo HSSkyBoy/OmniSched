@@ -10,6 +10,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -30,6 +31,55 @@ namespace {
         VulkanMode vulkan_mode = VulkanMode::OFF;
         std::unordered_set<std::string> vulkan_apps;
     };
+
+    const char* get_vulkan_prop_override(const std::string& prop_name) {
+        static const std::pair<const char*, const char*> overrides[] = {
+            {"ro.hwui.renderer", "skiavk"},
+            {"debug.hwui.renderer", "skiavk"},
+            {"debug.renderengine.backend", "skiavk"},
+            {"ro.hwui.use_vulkan", "true"},
+            {"debug.renderengine.graphite", "false"},
+            {"debug.renderengine.vulkan", "true"},
+            {"debug.renderengine.vulkan.precompile.enabled", "true"},
+            {"debug.hwui.vulkan_feature_level", "1.3"},
+            {"debug.hwui.vulkan.auto_detect_features", "true"},
+            {"debug.hwui.vulkan.platform_optimized", "true"},
+            {"debug.hwui.vulkan.enable_dynamic_rendering", "true"},
+            {"debug.hwui.vulkan.synchronization2", "true"},
+            {"debug.hwui.vulkan.enable_descriptor_indexing", "true"},
+            {"debug.hwui.vulkan.host_image_copy", "true"},
+            {"debug.hwui.vulkan.dynamic_rendering_local_read", "true"},
+            {"debug.hwui.vulkan.descriptor_heap", "true"},
+            {"debug.hwui.vulkan.fragment_shading_rate", "true"},
+            {"debug.hwui.vulkan.maintenance6", "true"},
+            {"debug.hwui.vulkan.pipeline_robustness", "true"},
+            {"debug.hwui.vulkan.pipeline_cache_persistent", "true"},
+            {"debug.hwui.enable_gpu_pipeline_cache", "true"},
+            {"debug.hwui.precompile_shaders", "true"},
+            {"debug.hwui.shader_cache_preload", "true"},
+            {"debug.hwui.shader_cache_warmup", "true"},
+            {"debug.hwui.enable_compute_shaders", "true"},
+            {"debug.vulkan.memory.preallocate", "true"},
+            {"debug.vulkan.memory.sub_allocation", "true"},
+            {"debug.hwui.fallback_renderer", "skiagl"},
+            {"debug.hwui.initialize_gl_always", "false"},
+            {"debug.hwui.early_preload_gl_context", "false"},
+            {"debug.hwui.vulkan_safe_mode", "false"},
+            {"debug.hwui.skia_tracing_enabled", "false"},
+            {"debug.hwui.skia_use_perfetto_track_events", "false"},
+            {"debug.renderengine.skia_atrace_enabled", "false"},
+            {"debug.vulkan.force_validation", "false"},
+            {"debug.vulkan.validate.memory", "false"},
+            {"debug.vulkan.validate", "false"},
+            {"debug.hwui.use_hint_manager", "true"},
+            {"debug.sf.enable_async_barrier_control", "true"}
+        };
+
+        for (const auto& [key, value] : overrides) {
+            if (prop_name == key) return value;
+        }
+        return nullptr;
+    }
 
     RenderConfigSnapshot load_render_config() {
         static RenderConfigSnapshot cached_snapshot;
@@ -91,18 +141,9 @@ namespace {
         }
 
         std::string prop_name(name);
-        if (prop_name == "ro.hwui.renderer" ||
-                prop_name == "debug.hwui.renderer" ||
-                prop_name == "debug.renderengine.backend") {
-            strcpy(value, "skiavk");
-            return strlen(value);
-        }
-        if (prop_name == "ro.hwui.use_vulkan") {
-            strcpy(value, "true");
-            return strlen(value);
-        }
-        if (prop_name == "debug.renderengine.graphite") {
-            strcpy(value, "false");
+        const char* override_value = get_vulkan_prop_override(prop_name);
+        if (override_value != nullptr) {
+            strcpy(value, override_value);
             return strlen(value);
         }
 
@@ -142,10 +183,50 @@ namespace {
         JNIEnv* env_ = nullptr;
 
         void apply_per_app_vulkan_env() {
-            setenv("debug.hwui.renderer", "skiavk", 1);
-            setenv("debug.renderengine.backend", "skiavk", 1);
-            setenv("ro.hwui.use_vulkan", "true", 1);
-            setenv("debug.renderengine.graphite", "false", 1);
+            static const std::pair<const char*, const char*> env_overrides[] = {
+                {"debug.hwui.renderer", "skiavk"},
+                {"debug.renderengine.backend", "skiavk"},
+                {"ro.hwui.use_vulkan", "true"},
+                {"debug.renderengine.graphite", "false"},
+                {"debug.renderengine.vulkan", "true"},
+                {"debug.renderengine.vulkan.precompile.enabled", "true"},
+                {"debug.hwui.vulkan_feature_level", "1.3"},
+                {"debug.hwui.vulkan.auto_detect_features", "true"},
+                {"debug.hwui.vulkan.platform_optimized", "true"},
+                {"debug.hwui.vulkan.enable_dynamic_rendering", "true"},
+                {"debug.hwui.vulkan.synchronization2", "true"},
+                {"debug.hwui.vulkan.enable_descriptor_indexing", "true"},
+                {"debug.hwui.vulkan.host_image_copy", "true"},
+                {"debug.hwui.vulkan.dynamic_rendering_local_read", "true"},
+                {"debug.hwui.vulkan.descriptor_heap", "true"},
+                {"debug.hwui.vulkan.fragment_shading_rate", "true"},
+                {"debug.hwui.vulkan.maintenance6", "true"},
+                {"debug.hwui.vulkan.pipeline_robustness", "true"},
+                {"debug.hwui.vulkan.pipeline_cache_persistent", "true"},
+                {"debug.hwui.enable_gpu_pipeline_cache", "true"},
+                {"debug.hwui.precompile_shaders", "true"},
+                {"debug.hwui.shader_cache_preload", "true"},
+                {"debug.hwui.shader_cache_warmup", "true"},
+                {"debug.hwui.enable_compute_shaders", "true"},
+                {"debug.vulkan.memory.preallocate", "true"},
+                {"debug.vulkan.memory.sub_allocation", "true"},
+                {"debug.hwui.fallback_renderer", "skiagl"},
+                {"debug.hwui.initialize_gl_always", "false"},
+                {"debug.hwui.early_preload_gl_context", "false"},
+                {"debug.hwui.vulkan_safe_mode", "false"},
+                {"debug.hwui.skia_tracing_enabled", "false"},
+                {"debug.hwui.skia_use_perfetto_track_events", "false"},
+                {"debug.renderengine.skia_atrace_enabled", "false"},
+                {"debug.vulkan.force_validation", "false"},
+                {"debug.vulkan.validate.memory", "false"},
+                {"debug.vulkan.validate", "false"},
+                {"debug.hwui.use_hint_manager", "true"},
+                {"debug.sf.enable_async_barrier_control", "true"}
+            };
+
+            for (const auto& [key, value] : env_overrides) {
+                setenv(key, value, 1);
+            }
             setenv("OMNISCHED_VULKAN_INJECTED", "1", 1);
 
             api_->pltHookRegister(0, 0, "__system_property_get",

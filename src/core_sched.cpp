@@ -9,8 +9,13 @@
 #include <cctype>
 #include <cstring>
 #include <algorithm>
+#include <array>
 #include <dirent.h>
 #include <initializer_list>
+#include <optional>
+#include <regex>
+#include <unordered_set>
+#include <utility>
 
 namespace {
     constexpr const char* AUTO_TOP_APP_UCLAMP_MIN_ENTRY = "12";
@@ -43,11 +48,26 @@ namespace {
         int scaling_max_freq_khz = -1;
     };
 
+    struct RefreshRateOverrideState {
+        bool original_loaded = false;
+        bool override_active = false;
+        std::string last_package;
+        std::optional<std::string> original_peak_refresh_rate;
+        std::optional<std::string> original_min_refresh_rate;
+    };
+
     std::string first_non_empty(std::initializer_list<std::string> values) {
         for (const auto& value : values) {
             if (!value.empty()) return value;
         }
         return {};
+    }
+
+    std::string trim_copy(std::string value) {
+        const auto first = value.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) return {};
+        const auto last = value.find_last_not_of(" \t\r\n");
+        return value.substr(first, last - first + 1);
     }
 
     bool name_starts_with(const char* value, const char* prefix) {
@@ -145,8 +165,154 @@ namespace {
         return soc.find("mediatek") != std::string::npos || soc.find("mtk") != std::string::npos;
     }
 
+    void apply_system_props(
+        const IRootAdapter& root,
+        std::initializer_list<std::pair<const char*, const char*>> props
+    ) {
+        for (const auto& [key, value] : props) {
+            root.set_system_prop(key, value);
+        }
+    }
+
+    std::optional<std::string> read_system_setting(const char* key) {
+        const std::string command = std::string("settings get system ") + key + " 2>/dev/null";
+        const std::string value = trim_copy(execute_command(command.c_str()));
+        if (value.empty() || value == "null") return std::nullopt;
+        return value;
+    }
+
+    void write_system_setting(const char* key, const std::string& value) {
+        const std::string command = "settings put system " + std::string(key) + " " + value;
+        execute_command(command.c_str());
+    }
+
+    void restore_system_setting(const char* key, const std::optional<std::string>& value) {
+        const std::string command = value.has_value()
+            ? "settings put system " + std::string(key) + " " + *value
+            : "settings delete system " + std::string(key);
+        execute_command(command.c_str());
+    }
+
+    std::optional<std::string> extract_package_name(const std::string& text) {
+        static const std::regex package_pattern(R"(([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)\/)");
+        std::smatch match;
+        if (std::regex_search(text, match, package_pattern) && match.size() > 1) {
+            return match[1].str();
+        }
+        return std::nullopt;
+    }
+
+    std::optional<std::string> get_foreground_package_name() {
+        static const std::array<const char*, 3> commands = {
+            "sh -c \"dumpsys activity activities 2>/dev/null | grep 'mResumedActivity' | tail -n 1\"",
+            "sh -c \"dumpsys activity activities 2>/dev/null | grep 'topResumedActivity' | tail -n 1\"",
+            "sh -c \"dumpsys window windows 2>/dev/null | grep 'mCurrentFocus' | tail -n 1\""
+        };
+
+        for (const char* command : commands) {
+            const auto package_name = extract_package_name(execute_command(command));
+            if (package_name.has_value()) return package_name;
+        }
+        return std::nullopt;
+    }
+
+    bool should_limit_short_video_refresh_rate(
+        const OmniConfig& config,
+        const std::optional<std::string>& foreground_package
+    ) {
+        if (!config.display.short_video_refresh_rate_enabled || !foreground_package.has_value()) {
+            return false;
+        }
+
+        const std::unordered_set<std::string> apps(
+            config.display.short_video_apps.begin(),
+            config.display.short_video_apps.end()
+        );
+        return apps.contains(*foreground_package);
+    }
+
+    void apply_short_video_refresh_rate(
+        const OmniConfig& config,
+        const std::optional<std::string>& foreground_package
+    ) {
+        static RefreshRateOverrideState state;
+
+        if (!state.original_loaded) {
+            state.original_peak_refresh_rate = read_system_setting("peak_refresh_rate");
+            state.original_min_refresh_rate = read_system_setting("min_refresh_rate");
+            state.original_loaded = true;
+        }
+
+        const bool should_limit = should_limit_short_video_refresh_rate(config, foreground_package);
+        const std::string current_package = foreground_package.value_or("");
+        const std::string target_rate = std::to_string(config.display.short_video_refresh_rate_hz) + ".0";
+
+        if (should_limit) {
+            if (!state.override_active || state.last_package != current_package) {
+                write_system_setting("peak_refresh_rate", target_rate);
+                write_system_setting("min_refresh_rate", target_rate);
+                state.override_active = true;
+                state.last_package = current_package;
+            }
+            return;
+        }
+
+        if (state.override_active) {
+            restore_system_setting("peak_refresh_rate", state.original_peak_refresh_rate);
+            restore_system_setting("min_refresh_rate", state.original_min_refresh_rate);
+            state.override_active = false;
+            state.last_package.clear();
+        }
+    }
+
+    void reset_global_vulkan_props(const IRootAdapter& root) {
+        apply_system_props(root, {
+            {"ro.hwui.renderer", "skiagl"},
+            {"debug.hwui.renderer", "skiagl"},
+            {"debug.renderengine.backend", "skiagl"},
+            {"ro.hwui.use_vulkan", "false"},
+            {"debug.renderengine.graphite", "true"},
+            {"debug.renderengine.vulkan", "false"},
+            {"debug.renderengine.vulkan.precompile.enabled", "false"},
+            {"debug.vulkan.layers", ""},
+            {"debug.hwui.vulkan_feature_level", ""},
+            {"debug.hwui.vulkan.auto_detect_features", "false"},
+            {"debug.hwui.vulkan.platform_optimized", "false"},
+            {"debug.hwui.vulkan.enable_dynamic_rendering", "false"},
+            {"debug.hwui.vulkan.synchronization2", "false"},
+            {"debug.hwui.vulkan.enable_descriptor_indexing", "false"},
+            {"debug.hwui.vulkan.host_image_copy", "false"},
+            {"debug.hwui.vulkan.dynamic_rendering_local_read", "false"},
+            {"debug.hwui.vulkan.descriptor_heap", "false"},
+            {"debug.hwui.vulkan.fragment_shading_rate", "false"},
+            {"debug.hwui.vulkan.maintenance6", "false"},
+            {"debug.hwui.vulkan.pipeline_robustness", "false"},
+            {"debug.hwui.vulkan.pipeline_cache_persistent", "false"},
+            {"debug.hwui.enable_gpu_pipeline_cache", "false"},
+            {"debug.hwui.precompile_shaders", "false"},
+            {"debug.hwui.shader_cache_preload", "false"},
+            {"debug.hwui.shader_cache_warmup", "false"},
+            {"debug.hwui.enable_compute_shaders", "false"},
+            {"debug.vulkan.memory.preallocate", "false"},
+            {"debug.vulkan.memory.sub_allocation", "false"},
+            {"debug.hwui.fallback_renderer", "skiagl"},
+            {"debug.hwui.initialize_gl_always", "false"},
+            {"debug.hwui.early_preload_gl_context", "false"},
+            {"debug.hwui.vulkan_safe_mode", "false"},
+            {"debug.hwui.skia_tracing_enabled", "false"},
+            {"debug.hwui.skia_use_perfetto_track_events", "false"},
+            {"debug.renderengine.skia_atrace_enabled", "false"},
+            {"debug.vulkan.force_validation", "false"},
+            {"debug.vulkan.validate.memory", "false"},
+            {"debug.vulkan.validate", "false"},
+            {"debug.hwui.use_hint_manager", "true"},
+            {"debug.sf.enable_async_barrier_control", "false"}
+        });
+    }
+
     void apply_render_engine_optimizations(const OmniConfig& config, const IRootAdapter& root) {
         if (config.vulkan_mode == VulkanMode::OFF || config.vulkan_mode == VulkanMode::PER_APP) {
+            reset_global_vulkan_props(root);
             return;
         }
 
@@ -167,9 +333,43 @@ namespace {
             root.set_system_prop("debug.renderengine.graphite", "true");
         }
 
-        root.set_system_prop("debug.vulkan.layers", "");
-        root.set_system_prop("debug.hwui.skia_tracing_enabled", "false");
-        root.set_system_prop("debug.renderengine.vulkan.precompile.enabled", "true");
+        apply_system_props(root, {
+            {"debug.vulkan.layers", ""},
+            {"debug.renderengine.vulkan", "true"},
+            {"debug.renderengine.vulkan.precompile.enabled", "true"},
+            {"debug.hwui.vulkan_feature_level", "1.3"},
+            {"debug.hwui.vulkan.auto_detect_features", "true"},
+            {"debug.hwui.vulkan.platform_optimized", "true"},
+            {"debug.hwui.vulkan.enable_dynamic_rendering", "true"},
+            {"debug.hwui.vulkan.synchronization2", "true"},
+            {"debug.hwui.vulkan.enable_descriptor_indexing", "true"},
+            {"debug.hwui.vulkan.host_image_copy", "true"},
+            {"debug.hwui.vulkan.dynamic_rendering_local_read", "true"},
+            {"debug.hwui.vulkan.descriptor_heap", "true"},
+            {"debug.hwui.vulkan.fragment_shading_rate", "true"},
+            {"debug.hwui.vulkan.maintenance6", "true"},
+            {"debug.hwui.vulkan.pipeline_robustness", "true"},
+            {"debug.hwui.vulkan.pipeline_cache_persistent", "true"},
+            {"debug.hwui.enable_gpu_pipeline_cache", "true"},
+            {"debug.hwui.precompile_shaders", "true"},
+            {"debug.hwui.shader_cache_preload", "true"},
+            {"debug.hwui.shader_cache_warmup", "true"},
+            {"debug.hwui.enable_compute_shaders", "true"},
+            {"debug.vulkan.memory.preallocate", "true"},
+            {"debug.vulkan.memory.sub_allocation", "true"},
+            {"debug.hwui.fallback_renderer", "skiagl"},
+            {"debug.hwui.initialize_gl_always", "false"},
+            {"debug.hwui.early_preload_gl_context", "false"},
+            {"debug.hwui.vulkan_safe_mode", "false"},
+            {"debug.hwui.skia_tracing_enabled", "false"},
+            {"debug.hwui.skia_use_perfetto_track_events", "false"},
+            {"debug.renderengine.skia_atrace_enabled", "false"},
+            {"debug.vulkan.force_validation", "false"},
+            {"debug.vulkan.validate.memory", "false"},
+            {"debug.vulkan.validate", "false"},
+            {"debug.hwui.use_hint_manager", "true"},
+            {"debug.sf.enable_async_barrier_control", "true"}
+        });
     }
 
     void write_node_if_exists(const std::string& path, const char* value) {
@@ -577,4 +777,10 @@ void apply_core_optimizations() {
     apply_input_boost_optimizations(config);
     apply_thermal_guard(config);
     apply_render_engine_optimizations(config, root);
+}
+
+void apply_foreground_refresh_rate_limits() {
+    OmniConfig::reload();
+    const auto& config = OmniConfig::get();
+    apply_short_video_refresh_rate(config, get_foreground_package_name());
 }

@@ -27,6 +27,7 @@ private:
         IN_MODIFY | IN_CLOSE_WRITE | IN_ATTRIB | IN_DELETE_SELF | IN_MOVE_SELF;
     static constexpr uint32_t DIR_WATCH_MASK =
         IN_CREATE | IN_MOVED_TO | IN_CLOSE_WRITE | IN_ATTRIB | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF;
+    static constexpr int SHORT_VIDEO_REFRESH_TIMEOUT_MS = 2000;
 
     int get_auto_timeout_seconds() const {
         const auto& topology = CpuTopology::get();
@@ -39,9 +40,14 @@ private:
         return 600;
     }
 
-    int get_timeout_ms() const {
+    bool has_short_video_refresh_task() const {
         OmniConfig::reload();
+        const auto& config = OmniConfig::get();
+        return config.display.short_video_refresh_rate_enabled && !config.display.short_video_apps.empty();
+    }
 
+    int get_poll_timeout_ms() const {
+        OmniConfig::reload();
         int timeout_seconds = OmniConfig::get().poll_interval_seconds;
         if (OmniConfig::get().auto_optimize) {
             timeout_seconds = get_auto_timeout_seconds();
@@ -51,6 +57,14 @@ private:
 
         timeout_seconds = std::clamp(timeout_seconds, 300, 3600);
         return timeout_seconds * 1000;
+    }
+
+    int get_timeout_ms() const {
+        int timeout_ms = get_poll_timeout_ms();
+        if (has_short_video_refresh_task()) {
+            timeout_ms = std::min(timeout_ms, SHORT_VIDEO_REFRESH_TIMEOUT_MS);
+        }
+        return timeout_ms;
     }
 
     void clear_watches() {
@@ -164,11 +178,18 @@ public:
         if (epoll_fd >= 0) close(epoll_fd);
     }
 
-    void collect(const std::function<void()>& action) {
+    void collect(const std::function<void()>& action, const std::function<void()>& periodic_action) {
+        auto last_action_at = std::chrono::steady_clock::now();
+
         if (epoll_fd < 0 || inotify_fd < 0) {
             while (true) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(get_timeout_ms()));
-                action();
+                periodic_action();
+                const auto now = std::chrono::steady_clock::now();
+                if (now - last_action_at >= std::chrono::milliseconds(get_poll_timeout_ms())) {
+                    action();
+                    last_action_at = now;
+                }
             }
         }
 
@@ -178,14 +199,21 @@ public:
             const int event_count = epoll_wait(epoll_fd, events, 4, get_timeout_ms());
 
             if (event_count == 0) {
-                action();
+                periodic_action();
+                const auto now = std::chrono::steady_clock::now();
+                if (now - last_action_at >= std::chrono::milliseconds(get_poll_timeout_ms())) {
+                    action();
+                    last_action_at = now;
+                }
                 continue;
             }
             if (event_count < 0) {
                 if (errno == EINTR) continue;
                 refresh_watches();
                 std::this_thread::sleep_for(std::chrono::seconds(2));
+                periodic_action();
                 action();
+                last_action_at = std::chrono::steady_clock::now();
                 continue;
             }
 
@@ -198,6 +226,7 @@ public:
 
             if (should_apply) {
                 action();
+                last_action_at = std::chrono::steady_clock::now();
                 std::this_thread::sleep_for(std::chrono::seconds(2));
             }
         }

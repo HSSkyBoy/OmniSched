@@ -49,6 +49,11 @@ write_default_config() {
     "top_app_uclamp_max": -1,
     "foreground_uclamp_max": -1,
     "background_uclamp_max": -1
+  },
+  "display": {
+    "short_video_refresh_rate_enabled": false,
+    "short_video_refresh_rate_hz": 30,
+    "short_video_apps": []
   }
 }
 EOF
@@ -107,22 +112,96 @@ if [ -f "$CONFIG_FILE" ]; then
     fi
 fi
 
-if [ "$VULKAN_MODE" != "global" ]; then
+reset_global_vulkan_props() {
     resetprop -n ro.hwui.renderer skiagl
     resetprop -n debug.hwui.renderer skiagl
     resetprop -n debug.renderengine.backend skiagl
     resetprop -n ro.hwui.use_vulkan false
     resetprop -n debug.renderengine.graphite true
+    resetprop -n debug.renderengine.vulkan false
     resetprop -n debug.renderengine.vulkan.precompile.enabled false
-else
+    resetprop -n debug.vulkan.layers ""
+    resetprop -n debug.hwui.vulkan_feature_level ""
+    resetprop -n debug.hwui.vulkan.auto_detect_features false
+    resetprop -n debug.hwui.vulkan.platform_optimized false
+    resetprop -n debug.hwui.vulkan.enable_dynamic_rendering false
+    resetprop -n debug.hwui.vulkan.synchronization2 false
+    resetprop -n debug.hwui.vulkan.enable_descriptor_indexing false
+    resetprop -n debug.hwui.vulkan.host_image_copy false
+    resetprop -n debug.hwui.vulkan.dynamic_rendering_local_read false
+    resetprop -n debug.hwui.vulkan.descriptor_heap false
+    resetprop -n debug.hwui.vulkan.fragment_shading_rate false
+    resetprop -n debug.hwui.vulkan.maintenance6 false
+    resetprop -n debug.hwui.vulkan.pipeline_robustness false
+    resetprop -n debug.hwui.vulkan.pipeline_cache_persistent false
+    resetprop -n debug.hwui.enable_gpu_pipeline_cache false
+    resetprop -n debug.hwui.precompile_shaders false
+    resetprop -n debug.hwui.shader_cache_preload false
+    resetprop -n debug.hwui.shader_cache_warmup false
+    resetprop -n debug.hwui.enable_compute_shaders false
+    resetprop -n debug.vulkan.memory.preallocate false
+    resetprop -n debug.vulkan.memory.sub_allocation false
+    resetprop -n debug.hwui.fallback_renderer skiagl
+    resetprop -n debug.hwui.initialize_gl_always false
+    resetprop -n debug.hwui.early_preload_gl_context false
+    resetprop -n debug.hwui.vulkan_safe_mode false
+    resetprop -n debug.hwui.skia_tracing_enabled false
+    resetprop -n debug.hwui.skia_use_perfetto_track_events false
+    resetprop -n debug.renderengine.skia_atrace_enabled false
+    resetprop -n debug.vulkan.force_validation false
+    resetprop -n debug.vulkan.validate.memory false
+    resetprop -n debug.vulkan.validate false
+    resetprop -n debug.hwui.use_hint_manager true
+    resetprop -n debug.sf.enable_async_barrier_control false
+}
+
+apply_global_vulkan_props() {
     resetprop -n ro.hwui.renderer skiavk
     resetprop -n debug.hwui.renderer skiavk
     resetprop -n debug.renderengine.backend skiavk
     resetprop -n ro.hwui.use_vulkan true
     resetprop -n debug.renderengine.graphite false
-    resetprop -n debug.renderengine.vulkan.precompile.enabled false
-    resetprop -n debug.hwui.use_buffer_age true
-    resetprop -n debug.hwui.disable_scissor_opt false
+    resetprop -n debug.renderengine.vulkan true
+    resetprop -n debug.renderengine.vulkan.precompile.enabled true
+    resetprop -n debug.vulkan.layers ""
+    resetprop -n debug.hwui.vulkan_feature_level 1.3
+    resetprop -n debug.hwui.vulkan.auto_detect_features true
+    resetprop -n debug.hwui.vulkan.platform_optimized true
+    resetprop -n debug.hwui.vulkan.enable_dynamic_rendering true
+    resetprop -n debug.hwui.vulkan.synchronization2 true
+    resetprop -n debug.hwui.vulkan.enable_descriptor_indexing true
+    resetprop -n debug.hwui.vulkan.host_image_copy true
+    resetprop -n debug.hwui.vulkan.dynamic_rendering_local_read true
+    resetprop -n debug.hwui.vulkan.descriptor_heap true
+    resetprop -n debug.hwui.vulkan.fragment_shading_rate true
+    resetprop -n debug.hwui.vulkan.maintenance6 true
+    resetprop -n debug.hwui.vulkan.pipeline_robustness true
+    resetprop -n debug.hwui.vulkan.pipeline_cache_persistent true
+    resetprop -n debug.hwui.enable_gpu_pipeline_cache true
+    resetprop -n debug.hwui.precompile_shaders true
+    resetprop -n debug.hwui.shader_cache_preload true
+    resetprop -n debug.hwui.shader_cache_warmup true
+    resetprop -n debug.hwui.enable_compute_shaders true
+    resetprop -n debug.vulkan.memory.preallocate true
+    resetprop -n debug.vulkan.memory.sub_allocation true
+    resetprop -n debug.hwui.fallback_renderer skiagl
+    resetprop -n debug.hwui.initialize_gl_always false
+    resetprop -n debug.hwui.early_preload_gl_context false
+    resetprop -n debug.hwui.vulkan_safe_mode false
+    resetprop -n debug.hwui.skia_tracing_enabled false
+    resetprop -n debug.hwui.skia_use_perfetto_track_events false
+    resetprop -n debug.renderengine.skia_atrace_enabled false
+    resetprop -n debug.vulkan.force_validation false
+    resetprop -n debug.vulkan.validate.memory false
+    resetprop -n debug.vulkan.validate false
+    resetprop -n debug.hwui.use_hint_manager true
+    resetprop -n debug.sf.enable_async_barrier_control true
+}
+
+if [ "$VULKAN_MODE" != "global" ]; then
+    reset_global_vulkan_props
+else
+    apply_global_vulkan_props
 fi
 
 SOC=$(getprop ro.soc.manufacturer)

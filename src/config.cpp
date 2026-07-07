@@ -41,6 +41,22 @@ std::string read_cpuset_value(const json& node, const char* key) {
     return normalize_cpuset(trim_copy(node[key].get<std::string>()));
 }
 
+std::vector<std::string> read_package_list(const json& node, const char* key) {
+    std::vector<std::string> packages;
+    if (!node.contains(key) || !node[key].is_array()) return packages;
+
+    std::unordered_set<std::string> seen;
+    for (const auto& entry : node[key]) {
+        if (!entry.is_string()) continue;
+        const std::string package_name = trim_copy(entry.get<std::string>());
+        if (package_name.empty() || !seen.insert(package_name).second) continue;
+        packages.push_back(package_name);
+    }
+
+    std::sort(packages.begin(), packages.end());
+    return packages;
+}
+
 }  // namespace
 
 const OmniConfig& OmniConfig::get() { return current_config; }
@@ -84,16 +100,7 @@ void OmniConfig::reload() {
             else if (vMode == "per_app") current_config.vulkan_mode = VulkanMode::PER_APP;
             else current_config.vulkan_mode = VulkanMode::OFF;
         }
-        if (renderNode.contains("vulkan_apps") && renderNode["vulkan_apps"].is_array()) {
-            std::unordered_set<std::string> seen_apps;
-            for (const auto& app : renderNode["vulkan_apps"]) {
-                if (!app.is_string()) continue;
-
-                const std::string package_name = trim_copy(app.get<std::string>());
-                if (package_name.empty() || !seen_apps.insert(package_name).second) continue;
-                current_config.vulkan_apps.push_back(package_name);
-            }
-        }
+        current_config.vulkan_apps = read_package_list(renderNode, "vulkan_apps");
     }
     if (data.contains("performance") && data["performance"].is_object()) {
         auto perfNode = data["performance"];
@@ -153,5 +160,21 @@ void OmniConfig::reload() {
             read_clamped_int(thermal_node, "foreground_uclamp_max", current_config.thermal.foreground_uclamp_max, 0, 100);
         current_config.thermal.background_uclamp_max =
             read_clamped_int(thermal_node, "background_uclamp_max", current_config.thermal.background_uclamp_max, 0, 100);
+    }
+
+    if (data.contains("display") && data["display"].is_object()) {
+        const auto& display_node = data["display"];
+        current_config.display.short_video_refresh_rate_enabled = display_node.value(
+            "short_video_refresh_rate_enabled",
+            current_config.display.short_video_refresh_rate_enabled
+        );
+        current_config.display.short_video_refresh_rate_hz = read_clamped_int(
+            display_node,
+            "short_video_refresh_rate_hz",
+            current_config.display.short_video_refresh_rate_hz,
+            24,
+            60
+        );
+        current_config.display.short_video_apps = read_package_list(display_node, "short_video_apps");
     }
 }

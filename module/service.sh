@@ -49,6 +49,11 @@ write_default_config() {
     "top_app_uclamp_max": -1,
     "foreground_uclamp_max": -1,
     "background_uclamp_max": -1
+  },
+  "display": {
+    "short_video_refresh_rate_enabled": false,
+    "short_video_refresh_rate_hz": 30,
+    "short_video_apps": []
   }
 }
 EOF
